@@ -1,0 +1,17 @@
+{
+  "name": "@ai-sdlc/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@ai-sdlc/config": "0.1.0",
+    "@ai-sdlc/logger": "0.1.0",
+    "@ai-sdlc/orchestrator": "0.1.0",
+    "@ai-sdlc/types": "0.1.0",
+    "express": "^4.21.2"
+  }
+}

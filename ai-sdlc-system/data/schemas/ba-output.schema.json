@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["business_requirements", "user_stories", "edge_cases"],
+  "additionalProperties": false,
+  "properties": {
+    "business_requirements": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "user_stories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "edge_cases": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

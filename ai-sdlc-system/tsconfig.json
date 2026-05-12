@@ -1,0 +1,28 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/types" },
+    { "path": "packages/config" },
+    { "path": "packages/logger" },
+    { "path": "packages/utils" },
+    { "path": "core/agents" },
+    { "path": "core/tools" },
+    { "path": "core/workflows" },
+    { "path": "core/orchestrator" },
+    { "path": "core/memory" },
+    { "path": "apps/api" },
+    { "path": "apps/telegram-bot" },
+    { "path": "apps/worker" }
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true
+  }
+}

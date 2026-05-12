@@ -1,0 +1,19 @@
+{
+  "name": "@ai-sdlc/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@ai-sdlc/config": "0.1.0",
+    "@ai-sdlc/logger": "0.1.0",
+    "@ai-sdlc/memory": "0.1.0",
+    "@ai-sdlc/orchestrator": "0.1.0",
+    "@ai-sdlc/tools": "0.1.0",
+    "@ai-sdlc/types": "0.1.0",
+    "bullmq": "^5.34.5"
+  }
+}

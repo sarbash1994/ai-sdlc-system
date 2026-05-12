@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ai-sdlc/types": ["packages/types/src/index.ts"],
+      "@ai-sdlc/config": ["packages/config/src/index.ts"],
+      "@ai-sdlc/logger": ["packages/logger/src/index.ts"],
+      "@ai-sdlc/utils": ["packages/utils/src/index.ts"],
+      "@ai-sdlc/agents": ["core/agents/src/index.ts"],
+      "@ai-sdlc/tools": ["core/tools/src/index.ts"],
+      "@ai-sdlc/workflows": ["core/workflows/src/index.ts"],
+      "@ai-sdlc/orchestrator": ["core/orchestrator/src/index.ts"],
+      "@ai-sdlc/memory": ["core/memory/src/index.ts"]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@ai-sdlc/orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@ai-sdlc/agents": "0.1.0",
+    "@ai-sdlc/config": "0.1.0",
+    "@ai-sdlc/logger": "0.1.0",
+    "@ai-sdlc/memory": "0.1.0",
+    "@ai-sdlc/types": "0.1.0",
+    "@ai-sdlc/utils": "0.1.0",
+    "@ai-sdlc/workflows": "0.1.0",
+    "bullmq": "^5.34.5",
+    "openai": "^4.77.0"
+  }
+}
