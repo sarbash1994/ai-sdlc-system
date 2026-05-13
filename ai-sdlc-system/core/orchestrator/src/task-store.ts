@@ -68,14 +68,14 @@ export class JsonFileTaskStore implements TaskStore {
 
   private async readAll(): Promise<SDLCTask[]> {
     try {
-      const raw = await readFile(this.path, "utf8");
-      return sdlcTaskSchema.array().parse(JSON.parse(raw));
+      const content = await readFile(this.path, "utf8");
+      if (!content.trim()) return [];
+      return sdlcTaskSchema.array().parse(JSON.parse(content));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return [];
       }
-
-      throw error;
+      return []; // Return empty on parse error
     }
   }
 

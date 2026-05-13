@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { WorkerJob } from "@ai-sdlc/types";
 
 export const PIPELINE_QUEUE_NAME = "ai-sdlc-pipeline";
@@ -60,6 +60,11 @@ export async function recoverStuckJobs(): Promise<number> {
 
 export async function claimNextLocalJob(): Promise<LocalQueueRecord | undefined> {
   const jobs = await readJobs();
+  const absPath = resolve(queuePath);
+  
+  if (jobs.length > 0 || Math.random() < 0.2) {
+    console.log(`[Queue] Polling ${absPath}: found ${jobs.length} jobs. Statuses: ${jobs.map(j => j.status).join(', ')}`);
+  }
   const index = jobs.findIndex((job) => job.status === "queued");
   if (index === -1) {
     return undefined;
@@ -109,14 +114,17 @@ async function updateJob(
 }
 
 async function readJobs(): Promise<LocalQueueRecord[]> {
+  const absPath = resolve(queuePath);
   try {
-    return JSON.parse(await readFile(queuePath, "utf8")) as LocalQueueRecord[];
+    const content = await readFile(queuePath, "utf8");
+    if (!content.trim()) return [];
+    return JSON.parse(content) as LocalQueueRecord[];
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
     }
-
-    throw error;
+    console.error(`[Queue] Error reading jobs from ${absPath}:`, error);
+    return []; 
   }
 }
 

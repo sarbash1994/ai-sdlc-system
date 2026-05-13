@@ -1,143 +1,100 @@
-import { loadConfig } from "@ai-sdlc/config";
-import { logger } from "@ai-sdlc/logger";
-import { EmptyRetriever } from "@ai-sdlc/memory";
-import {
-  claimNextLocalJob,
-  completeLocalJob,
-  failLocalJob,
-  recoverStuckJobs,
-  JsonFileTaskStore,
-  PIPELINE_QUEUE_NAME,
-  PipelineOrchestrator
-} from "@ai-sdlc/orchestrator";
-import { createPullRequestFromDiffs } from "@ai-sdlc/tools";
-import { workerJobSchema } from "@ai-sdlc/types";
-import "./queues/pipeline.queue.js";
-const config = loadConfig();
-const taskStore = new JsonFileTaskStore("storage/tasks.json");
-const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
+console.log(">>> WORKER BOOTSTRAP STARTED");
 
-// Subscribe to task updates to notify Telegram
-orchestrator.addListener(async (task) => {
-  if (!task.telegramChatId || !config.telegramBotToken) return;
+async function main() {
+  console.log(">>> LOADING CONFIG MODULE...");
+  const { loadConfig } = await import("../../../packages/config/src/index.js");
+  const config = loadConfig();
+  console.log(">>> CONFIG READY.");
 
-  const stage = task.currentStage;
-  const status = task.status;
+  const logger = {
+    info: (...args) => console.log("[INFO]", ...args),
+    error: (...args) => console.error("[ERROR]", ...args),
+    warn: (...args) => console.warn("[WARN]", ...args),
+    debug: (...args) => console.debug("[DEBUG]", ...args),
+  };
+
+  console.log(">>> LOADING TASK STORE...");
+  const { JsonFileTaskStore } = await import("../../../core/orchestrator/src/task-store.js");
+  console.log(">>> TASK STORE LOADED.");
+
+  console.log(">>> LOADING QUEUE...");
+  const { claimNextLocalJob, completeLocalJob, failLocalJob, recoverStuckJobs } = await import("../../../core/orchestrator/src/queue.js");
+  console.log(">>> QUEUE LOADED.");
+
+  console.log(">>> LOADING ORCHESTRATOR CLASS...");
+  const { PipelineOrchestrator } = await import("../../../core/orchestrator/src/orchestrator.js");
+  console.log(">>> ORCHESTRATOR CLASS LOADED.");
+
+  console.log(">>> LOADING TYPES MODULE...");
+  const { workerJobSchema } = await import("../../../packages/types/src/index.js");
+  console.log(">>> TYPES MODULE LOADED.");
+
+  const { EmptyRetriever } = await import("../../../core/memory/src/index.js");
   
-  let emoji = "⏳";
-  if (status === "done") emoji = "✅";
-  if (status === "failed") emoji = "❌";
-  if (status === "running") emoji = "🚀";
+  const taskStore = new JsonFileTaskStore("storage/tasks.json");
+  const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
 
-  const message = `${emoji} *Task Update*\nID: \`${task.id}\`\nStage: *${stage}*\nStatus: *${status}*`;
+  console.log(">>> ALL INITIALIZED. STARTING POLLING...");
 
-  try {
-    await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: task.telegramChatId,
-        text: message,
-        parse_mode: "Markdown"
-      })
-    });
-  } catch (err) {
-    logger.error({ err, taskId: task.id }, "Failed to send telegram notification");
-  }
-});
-
-async function processQueue(): Promise<void> {
-  const job = await claimNextLocalJob();
-  if (!job) {
-    return;
-  }
-
-  try {
-    const data = workerJobSchema.parse(job.data);
-
-    if (data.kind === "run-pipeline") {
-      const task = await orchestrator.runMvpPipeline(data.taskId);
-
-      if (!task.backendDevOutput) {
-        throw new Error("Backend dev output missing after pipeline run");
-      }
-
-      if (config.githubToken && config.githubOwner && config.githubRepo) {
-        const result = await createPullRequestFromDiffs(
-          {
-            token: config.githubToken,
-            owner: config.githubOwner,
-            repo: config.githubRepo,
-            defaultBranch: config.githubDefaultBranch
-          },
-          {
-            taskId: task.id,
-            idea: task.idea,
-            devOutput: task.backendDevOutput
-          }
-        );
-        await orchestrator.attachPullRequest(task.id, result.url);
+  orchestrator.addListener(async (task) => {
+    if (!task.telegramChatId || !config.telegramBotToken) {
+        console.log(`>>> Skipping notification for task ${task.id}: Missing chatId (${task.telegramChatId}) or Token (${!!config.telegramBotToken})`);
+        return;
+    }
+    const stage = task.currentStage;
+    const status = task.status;
+    let emoji = "⏳";
+    if (status === "done") emoji = "✅";
+    if (status === "failed") emoji = "❌";
+    if (status === "running") emoji = "🚀";
+    let message = `${emoji} *Task Update*\n\n*ID:* \`${task.id}\`\n*Stage:* \`${stage}\`\n*Status:* \`${status}\``;
+    
+    if (task.pullRequestUrl) {
+        message += `\n\n*GitHub PR:* [View Changes](${task.pullRequestUrl})`;
+    }
+    
+    message += `\n\n_${new Date().toLocaleString()}_`;
+    
+    console.log(`>>> Sending Telegram notification for task ${task.id} (Stage: ${stage}, Status: ${status}) to ${task.telegramChatId}...`);
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: task.telegramChatId, text: message, parse_mode: "Markdown" })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`[ERROR] Telegram API returned ${res.status}: ${errorText}`);
       } else {
-        logger.warn("GitHub env is incomplete; skipping PR creation");
+        console.log(`[SUCCESS] Telegram notification sent for task ${task.id}`);
       }
-
-      await completeLocalJob(job.id);
-      logger.info({ jobId: job.id, taskId: task.id }, "worker job completed");
-      return;
+    } catch (err) {
+      console.error("[ERROR] Telegram fetch failed:", err);
     }
-
-    if (data.kind === "github-pr") {
-      const task = await taskStore.getTask(data.taskId);
-      if (!task) {
-        throw new Error(`Task not found: ${data.taskId}`);
-      }
-
-      const result = await createPullRequestFromDiffs(
-        {
-          token: requireEnv("GITHUB_TOKEN", config.githubToken),
-          owner: requireEnv("GITHUB_OWNER", config.githubOwner),
-          repo: requireEnv("GITHUB_REPO", config.githubRepo),
-          defaultBranch: config.githubDefaultBranch
-        },
-        {
-          taskId: task.id,
-          idea: task.idea,
-          devOutput: data.devOutput
-        }
-      );
-      await orchestrator.attachPullRequest(task.id, result.url);
-      await completeLocalJob(job.id);
-      logger.info({ jobId: job.id, taskId: task.id }, "worker job completed");
-      return;
-    }
-
-    throw new Error("Unsupported job kind");
-  } catch (error) {
-    await failLocalJob(job.id, error);
-    logger.error({ jobId: job.id, error }, "worker job failed");
-  }
-}
-
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-
-  return value;
-}
-
-console.log(`AI SDLC worker started: ${PIPELINE_QUEUE_NAME}`);
-logger.info({ queue: PIPELINE_QUEUE_NAME }, "AI SDLC worker started");
-
-const recovered = await recoverStuckJobs();
-if (recovered > 0) {
-  logger.warn({ count: recovered }, "recovered stuck processing jobs → re-queued");
-}
-
-setInterval(() => {
-  processQueue().catch((error) => {
-    logger.error({ error }, "worker polling failed");
   });
-}, 2000);
 
-await processQueue();
+  async function processQueue() {
+    const job = await claimNextLocalJob();
+    if (!job) return;
+    console.log(`[Worker] Processing job ${job.id} for task ${job.data.taskId}`);
+    try {
+      const data = workerJobSchema.parse(job.data);
+      await orchestrator.runMvpPipeline(data.taskId);
+      await completeLocalJob(job.id);
+    } catch (error) {
+      console.error("[Worker] Job failed:", error);
+      await failLocalJob(job.id, error);
+    }
+  }
+
+  setInterval(() => {
+    processQueue().catch(err => console.error("[Worker] Loop error:", err));
+  }, 2000);
+
+  await recoverStuckJobs();
+  await processQueue();
+}
+
+main().catch(err => {
+  console.error(">>> FATAL WORKER ERROR:", err);
+});

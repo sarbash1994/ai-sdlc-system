@@ -26,11 +26,15 @@ export async function runJsonAgent<TSchema extends z.ZodTypeAny>(
     temperature: 0.2
   });
 
-  const content = response.choices[0]?.message.content;
-  if (!content) {
-    throw new Error(`${options.agentName} returned no content`);
-  }
+  const content = response.choices[0]?.message?.content || "{}";
+  const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
+  console.log(`[Agent: ${options.agentName}] Raw output:`, cleaned);
 
-  const parsed = JSON.parse(content) as unknown;
-  return options.schema.parse(parsed);
+  try {
+    const json = JSON.parse(cleaned);
+    return options.schema.parse(json);
+  } catch (err) {
+    console.error(`[Agent: ${options.agentName}] Validation failed for output:`, cleaned);
+    throw err;
+  }
 }

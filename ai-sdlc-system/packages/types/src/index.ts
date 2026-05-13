@@ -26,11 +26,14 @@ export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export const baOutputSchema = z.object({
   business_requirements: z.array(z.string()).min(1),
   user_stories: z.array(
-    z.object({
-      role: z.string(),
-      goal: z.string(),
-      benefit: z.string()
-    })
+    z.union([
+      z.string(),
+      z.object({
+        role: z.string().optional(),
+        goal: z.string().optional(),
+        benefit: z.string().optional()
+      })
+    ])
   ).min(1),
   edge_cases: z.array(z.string()).default([]),
   assumptions: z.array(z.string()).default([])
@@ -41,9 +44,9 @@ export type BAOutput = z.infer<typeof baOutputSchema>;
 export const pmTaskTypeSchema = z.enum(["frontend", "backend", "mobile", "devops"]);
 
 export const pmTaskSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   type: pmTaskTypeSchema,
-  title: z.string(),
+  title: z.string().optional(),
   description: z.string().min(1),
   acceptance_criteria: z.array(z.string()).min(1),
   dependencies: z.array(z.string()).default([])

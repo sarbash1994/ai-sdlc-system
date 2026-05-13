@@ -12,8 +12,6 @@ export async function runBAAgent(params: {
     model: params.model,
     schema: baOutputSchema,
     agentName: "BA Agent",
-    systemPrompt:
-      "You are a Business Analyst agent. You analyze raw product ideas and produce structured requirements, user stories, and edge cases. You never execute actions.",
-    userPrompt: `Analyze this idea for implementation:\n\n${params.idea}\n\nRequired JSON shape: {"business_requirements":[],"user_stories":[],"edge_cases":[]}`
+    userPrompt: `Analyze this idea for implementation:\n\n${params.idea}\n\nRequired JSON shape:\n{\n  "business_requirements": ["string"],\n  "user_stories": [\n    {\n      "role": "string (e.g. User, Admin)",\n      "goal": "string (what they want to do)",\n      "benefit": "string (why they want to do it)"\n    }\n  ],\n  "edge_cases": ["string"],\n  "assumptions": ["string"]\n}`
   });
 }
