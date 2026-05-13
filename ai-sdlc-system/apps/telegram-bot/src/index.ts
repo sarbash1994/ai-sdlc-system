@@ -16,7 +16,7 @@ bot.use(async (ctx, next) => {
       updateType: ctx.updateType,
       fromId: ctx.from?.id,
       chatId: ctx.chat?.id,
-      messageText: "text" in (ctx.message ?? {}) ? (ctx.message as any).text : undefined
+      messageText: ctx.message && "text" in ctx.message ? ctx.message.text : undefined
     },
     "telegram update received"
   );
@@ -37,7 +37,7 @@ bot.start(async (ctx) => {
 });
 
 bot.command("agents", async (ctx) => {
-  await ctx.reply(["Available MVP agents:", "- BA", "- PM", "- Backend Developer", "- Frontend Developer", "- Mobile Developer", "- DevOps Engineer", "- QA Automation Engineer", "- QA Manual Engineer"].join("\n"));
+  await ctx.reply(["Available MVP agents:", "- BA (Business Analyst)", "- PM (Product Manager)", "- Backend Developer", "- Frontend Developer", "- Mobile Developer", "- DevOps Engineer", "- QA Automation Engineer", "- QA Manual Engineer"].join("\n"));
 });
 
 bot.command("idea", async (ctx) => {
