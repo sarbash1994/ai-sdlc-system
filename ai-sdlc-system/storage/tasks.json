@@ -1,0 +1,46 @@
+[
+  {
+    "id": "task_1778626994938_icqxct",
+    "idea": "Add a backend endpoint for health checks",
+    "status": "running",
+    "currentStage": "BA_ANALYSIS",
+    "stages": [
+      {
+        "name": "IDEA",
+        "status": "done",
+        "attempts": 0,
+        "startedAt": "2026-05-12T23:03:14.938Z",
+        "finishedAt": "2026-05-12T23:03:14.938Z"
+      },
+      {
+        "name": "BA_ANALYSIS",
+        "status": "running",
+        "attempts": 1,
+        "startedAt": "2026-05-12T23:03:16.460Z"
+      },
+      {
+        "name": "PM_PLANNING",
+        "status": "queued",
+        "attempts": 0
+      },
+      {
+        "name": "DEV_IMPLEMENTATION",
+        "status": "queued",
+        "attempts": 0
+      },
+      {
+        "name": "DONE",
+        "status": "queued",
+        "attempts": 0
+      }
+    ],
+    "logs": [
+      "2026-05-12T23:03:14.938Z IDEA received",
+      "2026-05-12T23:03:16.460Z BA_ANALYSIS running"
+    ],
+    "executions": [],
+    "createdAt": "2026-05-12T23:03:14.938Z",
+    "updatedAt": "2026-05-12T23:03:16.460Z",
+    "telegramChatId": 58330461
+  }
+]

@@ -1,8 +1,21 @@
-import express from "express";
-import { loadConfig } from "@ai-sdlc/config";
-import { logger } from "@ai-sdlc/logger";
-import { createPipelineQueue, JsonFileTaskStore } from "@ai-sdlc/orchestrator";
-import { createIdeaInputSchema } from "@ai-sdlc/types";
+console.log("AI SDLC API boot: starting imports");
+
+const [{ default: express }, { loadConfig }, { logger }, { createIdeaInputSchema }] =
+  await Promise.all([
+    import("express"),
+    import("@ai-sdlc/config"),
+    import("@ai-sdlc/logger"),
+    import("@ai-sdlc/types")
+  ]);
+
+console.log("AI SDLC API boot: base imports loaded");
+
+const [{ createPipelineQueue }, { JsonFileTaskStore }] = await Promise.all([
+  import("../../../core/orchestrator/src/queue.js"),
+  import("../../../core/orchestrator/src/task-store.js")
+]);
+
+console.log("AI SDLC API boot: queue/store imports loaded");
 
 const config = loadConfig();
 const app = express();
@@ -10,6 +23,14 @@ const taskStore = new JsonFileTaskStore("storage/tasks.json");
 const queue = createPipelineQueue(config.redisUrl);
 
 app.use(express.json({ limit: "1mb" }));
+
+app.use((request, _response, next) => {
+  logger.info(
+    { method: request.method, path: request.path },
+    "api request received"
+  );
+  next();
+});
 
 app.get("/health", (_request, response) => {
   response.json({ ok: true });
@@ -48,12 +69,20 @@ app.get("/tasks/:taskId", async (request, response, next) => {
   }
 });
 
+app.use((request, response) => {
+  response.status(404).json({
+    error: "Route not found",
+    method: request.method,
+    path: request.path
+  });
+});
+
 app.use(
   (
     error: unknown,
-    _request: express.Request,
-    response: express.Response,
-    _next: express.NextFunction
+    _request: import("express").Request,
+    response: import("express").Response,
+    _next: import("express").NextFunction
   ) => {
     logger.error({ error }, "api request failed");
     response.status(400).json({
@@ -63,5 +92,6 @@ app.use(
 );
 
 app.listen(config.apiPort, () => {
+  console.log(`AI SDLC API started on port ${config.apiPort}`);
   logger.info({ port: config.apiPort }, "AI SDLC API started");
 });

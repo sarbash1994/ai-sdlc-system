@@ -1,8 +1,10 @@
-import { Worker } from "bullmq";
 import { loadConfig } from "@ai-sdlc/config";
 import { logger } from "@ai-sdlc/logger";
 import { EmptyRetriever } from "@ai-sdlc/memory";
 import {
+  claimNextLocalJob,
+  completeLocalJob,
+  failLocalJob,
   JsonFileTaskStore,
   PIPELINE_QUEUE_NAME,
   PipelineOrchestrator
@@ -14,9 +16,13 @@ const config = loadConfig();
 const taskStore = new JsonFileTaskStore("storage/tasks.json");
 const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
 
-const worker = new Worker(
-  PIPELINE_QUEUE_NAME,
-  async (job) => {
+async function processQueue(): Promise<void> {
+  const job = await claimNextLocalJob();
+  if (!job) {
+    return;
+  }
+
+  try {
     const data = workerJobSchema.parse(job.data);
 
     if (data.kind === "run-pipeline") {
@@ -45,7 +51,9 @@ const worker = new Worker(
         logger.warn("GitHub env is incomplete; skipping PR creation");
       }
 
-      return { taskId: task.id };
+      await completeLocalJob(job.id);
+      logger.info({ jobId: job.id, taskId: task.id }, "worker job completed");
+      return;
     }
 
     if (data.kind === "github-pr") {
@@ -68,21 +76,17 @@ const worker = new Worker(
         }
       );
       await orchestrator.attachPullRequest(task.id, result.url);
-      return result;
+      await completeLocalJob(job.id);
+      logger.info({ jobId: job.id, taskId: task.id }, "worker job completed");
+      return;
     }
 
     throw new Error("Unsupported job kind");
-  },
-  { connection: { url: config.redisUrl } }
-);
-
-worker.on("completed", (job) => {
-  logger.info({ jobId: job.id }, "worker job completed");
-});
-
-worker.on("failed", (job, error) => {
-  logger.error({ jobId: job?.id, error }, "worker job failed");
-});
+  } catch (error) {
+    await failLocalJob(job.id, error);
+    logger.error({ jobId: job.id, error }, "worker job failed");
+  }
+}
 
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
@@ -92,4 +96,13 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
+console.log(`AI SDLC worker started: ${PIPELINE_QUEUE_NAME}`);
 logger.info({ queue: PIPELINE_QUEUE_NAME }, "AI SDLC worker started");
+
+setInterval(() => {
+  processQueue().catch((error) => {
+    logger.error({ error }, "worker polling failed");
+  });
+}, 2000);
+
+await processQueue();

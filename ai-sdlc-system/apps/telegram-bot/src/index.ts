@@ -11,6 +11,16 @@ if (!config.telegramBotToken) {
 const bot = new Telegraf(config.telegramBotToken);
 
 bot.use(async (ctx, next) => {
+  logger.info(
+    {
+      updateType: ctx.updateType,
+      fromId: ctx.from?.id,
+      chatId: ctx.chat?.id,
+      messageText: "text" in (ctx.message ?? {}) ? ctx.message.text : undefined
+    },
+    "telegram update received"
+  );
+
   if (
     config.telegramAllowedUserId &&
     ctx.from?.id !== config.telegramAllowedUserId
@@ -37,19 +47,25 @@ bot.command("idea", async (ctx) => {
     return;
   }
 
-  const response = await fetch(`${config.apiBaseUrl}/ideas`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ idea, telegramChatId: ctx.chat.id })
-  });
+  try {
+    const response = await fetch(`${config.apiBaseUrl}/ideas`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idea, telegramChatId: ctx.chat.id })
+    });
 
-  if (!response.ok) {
-    await ctx.reply(`Could not create task: ${await response.text()}`);
-    return;
+    if (!response.ok) {
+      await ctx.reply(`Could not create task: ${await response.text()}`);
+      return;
+    }
+
+    const task = (await response.json()) as { id: string; status: string };
+    await ctx.reply(`Task created: ${task.id}\nStatus: ${task.status}\nUse /status ${task.id}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error: message }, "telegram idea command failed");
+    await ctx.reply(`Could not reach API at ${config.apiBaseUrl}: ${message}`);
   }
-
-  const task = (await response.json()) as { id: string; status: string };
-  await ctx.reply(`Task created: ${task.id}\nStatus: ${task.status}\nUse /status ${task.id}`);
 });
 
 bot.command("status", async (ctx) => {
@@ -87,7 +103,19 @@ bot.catch((error) => {
   logger.error({ error }, "telegram bot error");
 });
 
+const botInfo = await bot.telegram.getMe();
+logger.info(
+  {
+    botId: botInfo.id,
+    username: botInfo.username,
+    allowedUserId: config.telegramAllowedUserId ?? null,
+    apiBaseUrl: config.apiBaseUrl
+  },
+  "telegram bot identity verified"
+);
+
 await bot.launch();
+console.log(`AI SDLC Telegram bot started: @${botInfo.username}`);
 logger.info("AI SDLC Telegram bot started");
 
 process.once("SIGINT", () => bot.stop("SIGINT"));

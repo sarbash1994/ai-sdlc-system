@@ -1,11 +1,39 @@
-import "dotenv/config";
+import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
+
+loadDotenv({ path: ".env.local" });
+loadDotenv();
+
+const optionalNumberFromEnv = z.preprocess(
+  (value) => {
+    if (value === "" || value === undefined || value === null) {
+      return undefined;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : undefined;
+    }
+
+    return undefined;
+  },
+  z.number().optional()
+);
 
 const configSchema = z.object({
   openaiApiKey: z.string().min(1),
   openaiModel: z.string().default("gpt-4.1-mini"),
   telegramBotToken: z.string().optional(),
-  telegramAllowedUserId: z.coerce.number().optional(),
+  telegramAllowedUserId: optionalNumberFromEnv,
   apiPort: z.coerce.number().default(3000),
   apiBaseUrl: z.string().url().default("http://localhost:3000"),
   redisUrl: z.string().url().default("redis://localhost:6379"),
