@@ -31,9 +31,15 @@ export async function createPullRequestFromDiffs(
     await writeFile(filePath, change.diff, "utf8");
   }
 
+  /* 
   for (const command of input.devOutput.commands) {
-    await shell(command, workdir);
+    try {
+      await shell(command, workdir);
+    } catch (err) {
+      console.warn(`[GitHub Worker] Command failed but continuing: ${command}`, err);
+    }
   }
+  */
 
   await git(["add", "."], workdir);
   await git(["commit", "-m", `AI SDLC: ${input.taskId}`], workdir);
