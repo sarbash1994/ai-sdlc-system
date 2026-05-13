@@ -155,21 +155,21 @@ export class PipelineOrchestrator {
 
       const { createPullRequestFromDiffs } = await import("../../tools/src/index.js");
 
-      const prUrl = await createPullRequestFromDiffs({
-        token: this.config.githubToken || "",
-        owner: this.config.githubOwner || "",
-        repo: this.config.githubRepo || "",
-        title: backendTask.title || `Task ${backendTask.id}`,
-        body: backendTask.description,
-        branch: branchName,
-        base: this.config.githubDefaultBranch,
-        changes: devOutput.changes.map(c => ({
-            path: c.file,
-            content: c.diff // Note: Assuming the tool handles diff-to-content or we need full content
-        }))
-      });
+      const prResult = await createPullRequestFromDiffs(
+        {
+          token: this.config.githubToken || "",
+          owner: this.config.githubOwner || "",
+          repo: this.config.githubRepo || "",
+          defaultBranch: this.config.githubDefaultBranch
+        },
+        {
+          taskId: task.id,
+          idea: task.idea,
+          devOutput: devOutput
+        }
+      );
 
-      task.pullRequestUrl = prUrl;
+      task.pullRequestUrl = prResult.url;
       task.backendDevOutput = devOutput;
       task = setStage(task, "DEV_IMPLEMENTATION", "done");
       await this.taskStore.saveTask(task);

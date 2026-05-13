@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { Octokit } from "@octokit/rest";
 import type {
@@ -24,10 +24,11 @@ export async function createPullRequestFromDiffs(
   await git(["pull", "origin", config.defaultBranch], workdir);
   await git(["checkout", "-b", input.devOutput.branch], workdir);
 
-  for (const [index, change] of input.devOutput.changes.entries()) {
-    const patchPath = join(workdir, `.ai-sdlc-change-${index}.patch`);
-    await writeFile(patchPath, change.diff, "utf8");
-    await git(["apply", "--whitespace=fix", patchPath], workdir);
+  for (const change of input.devOutput.changes) {
+    const filePath = join(workdir, change.file);
+    const dir = dirname(filePath);
+    await mkdir(dir, { recursive: true });
+    await writeFile(filePath, change.diff, "utf8");
   }
 
   for (const command of input.devOutput.commands) {
