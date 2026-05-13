@@ -392,5 +392,49 @@
       "commands": []
     },
     "pullRequestUrl": "https://github.com/sarbash1994/ai-sdlc-system/pull/1"
+  },
+  {
+    "id": "task_1778705681468_2klo33",
+    "idea": "реализуй функционал - если я пишу в чат то мне всегда должен отвечать ПМ и дальше при неоходимости передавал задачи которые мы определим.",
+    "status": "running",
+    "currentStage": "BA_ANALYSIS",
+    "stages": [
+      {
+        "name": "IDEA",
+        "status": "done",
+        "attempts": 0,
+        "startedAt": "2026-05-13T20:54:41.462Z",
+        "finishedAt": "2026-05-13T20:54:41.462Z"
+      },
+      {
+        "name": "BA_ANALYSIS",
+        "status": "running",
+        "attempts": 1,
+        "startedAt": "2026-05-13T20:54:42.970Z"
+      },
+      {
+        "name": "PM_PLANNING",
+        "status": "queued",
+        "attempts": 0
+      },
+      {
+        "name": "DEV_IMPLEMENTATION",
+        "status": "queued",
+        "attempts": 0
+      },
+      {
+        "name": "DONE",
+        "status": "queued",
+        "attempts": 0
+      }
+    ],
+    "logs": [
+      "2026-05-13T20:54:41.462Z IDEA received",
+      "2026-05-13T20:54:42.970Z BA_ANALYSIS running"
+    ],
+    "executions": [],
+    "createdAt": "2026-05-13T20:54:41.462Z",
+    "updatedAt": "2026-05-13T20:54:42.972Z",
+    "telegramChatId": 58330461
   }
 ]

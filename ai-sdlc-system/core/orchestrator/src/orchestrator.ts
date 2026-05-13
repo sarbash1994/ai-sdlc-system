@@ -6,8 +6,11 @@ import type { BackendDevOutput, SDLCTask } from "@ai-sdlc/types";
 import { nowIso, slugifyBranchPart } from "@ai-sdlc/utils";
 import { setStage, type TaskStore } from "./task-store.js";
 
+export type TaskListener = (task: SDLCTask) => Promise<void>;
+
 export class PipelineOrchestrator {
   private readonly client: OpenAI;
+  private readonly listeners: TaskListener[] = [];
 
   constructor(
     private readonly config: AppConfig,
@@ -17,13 +20,25 @@ export class PipelineOrchestrator {
     this.client = new OpenAI({ apiKey: config.openaiApiKey });
   }
 
+  addListener(listener: TaskListener): void {
+    this.listeners.push(listener);
+  }
+
+  private async notify(task: SDLCTask): Promise<void> {
+    await Promise.all(this.listeners.map(l => l(task).catch(err => console.error('Listener failed:', err))));
+  }
+
   async runMvpPipeline(taskId: string): Promise<SDLCTask> {
     const task = await this.requireTask(taskId);
+    
     const withBA = await this.runBA(task);
     const withPM = await this.runPM(withBA);
     const withBackend = await this.runBackendDev(withPM);
+    
     const done = setStage(withBackend, "DONE", "done");
     await this.taskStore.saveTask(done);
+    await this.notify(done);
+    
     return done;
   }
 
@@ -41,6 +56,7 @@ export class PipelineOrchestrator {
   private async runBA(task: SDLCTask): Promise<SDLCTask> {
     const running = setStage(task, "BA_ANALYSIS", "running");
     await this.taskStore.saveTask(running);
+    await this.notify(running);
     const output = await runBAAgent({
       client: this.client,
       model: this.config.openaiModel,
@@ -60,6 +76,7 @@ export class PipelineOrchestrator {
       "done"
     );
     await this.taskStore.saveTask(updated);
+    await this.notify(updated);
     return updated;
   }
 
@@ -70,6 +87,7 @@ export class PipelineOrchestrator {
 
     const running = setStage(task, "PM_PLANNING", "running");
     await this.taskStore.saveTask(running);
+    await this.notify(running);
     const output = await runPMAgent({
       client: this.client,
       model: this.config.openaiModel,
@@ -89,6 +107,7 @@ export class PipelineOrchestrator {
       "done"
     );
     await this.taskStore.saveTask(updated);
+    await this.notify(updated);
     return updated;
   }
 
@@ -100,6 +119,7 @@ export class PipelineOrchestrator {
 
     const running = setStage(task, "DEV_IMPLEMENTATION", "running");
     await this.taskStore.saveTask(running);
+    await this.notify(running);
     const context = await this.retriever.retrieve(backendTask.description);
     const output: BackendDevOutput = await runBackendDevAgent({
       client: this.client,
@@ -122,6 +142,7 @@ export class PipelineOrchestrator {
       "done"
     );
     await this.taskStore.saveTask(updated);
+    await this.notify(updated);
     return updated;
   }
 

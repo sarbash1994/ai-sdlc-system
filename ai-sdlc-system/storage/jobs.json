@@ -49,5 +49,18 @@
     "attempts": 2,
     "createdAt": "2026-05-13T20:33:53.113Z",
     "updatedAt": "2026-05-13T20:38:30.043Z"
+  },
+  {
+    "id": "job_1778705682677_vbescg",
+    "name": "run-pipeline",
+    "data": {
+      "kind": "run-pipeline",
+      "taskId": "task_1778705681468_2klo33"
+    },
+    "status": "failed",
+    "attempts": 1,
+    "createdAt": "2026-05-13T20:54:42.677Z",
+    "updatedAt": "2026-05-13T20:54:50.182Z",
+    "error": "[\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"string\",\n    \"received\": \"object\",\n    \"path\": [\n      \"user_stories\",\n      0\n    ],\n    \"message\": \"Expected string, received object\"\n  },\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"string\",\n    \"received\": \"object\",\n    \"path\": [\n      \"user_stories\",\n      1\n    ],\n    \"message\": \"Expected string, received object\"\n  }\n]"
   }
 ]

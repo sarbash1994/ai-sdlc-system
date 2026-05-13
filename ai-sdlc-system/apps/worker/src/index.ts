@@ -17,6 +17,35 @@ const config = loadConfig();
 const taskStore = new JsonFileTaskStore("storage/tasks.json");
 const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
 
+// Subscribe to task updates to notify Telegram
+orchestrator.addListener(async (task) => {
+  if (!task.telegramChatId || !config.telegramBotToken) return;
+
+  const stage = task.currentStage;
+  const status = task.status;
+  
+  let emoji = "⏳";
+  if (status === "done") emoji = "✅";
+  if (status === "failed") emoji = "❌";
+  if (status === "running") emoji = "🚀";
+
+  const message = `${emoji} *Task Update*\nID: \`${task.id}\`\nStage: *${stage}*\nStatus: *${status}*`;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: task.telegramChatId,
+        text: message,
+        parse_mode: "Markdown"
+      })
+    });
+  } catch (err) {
+    logger.error({ err, taskId: task.id }, "Failed to send telegram notification");
+  }
+});
+
 async function processQueue(): Promise<void> {
   const job = await claimNextLocalJob();
   if (!job) {
