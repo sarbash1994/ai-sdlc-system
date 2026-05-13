@@ -1,0 +1,69 @@
+import json
+import base64
+import os
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
+
+class MessageProtocolError(Exception):
+    pass
+
+class MessageProtocol:
+    """Messaging protocol for agent-to-agent communication with encryption and authentication."""
+
+    def __init__(self, key: bytes):
+        """
+        Initialize the protocol with a symmetric key.
+        :param key: 32-byte key for AES-256-GCM
+        """
+        if not isinstance(key, bytes) or len(key) != 32:
+            raise ValueError("Key must be 32 bytes")
+        self.key = key
+        self.aesgcm = AESGCM(key)
+
+    def encrypt_message(self, message: dict) -> str:
+        """
+        Encrypt and authenticate a message dictionary.
+        :param message: dict to send
+        :return: base64 encoded string of nonce + ciphertext + tag
+        """
+        try:
+            plaintext = json.dumps(message).encode('utf-8')
+        except (TypeError, ValueError) as e:
+            raise MessageProtocolError(f"Message serialization failed: {e}")
+
+        nonce = os.urandom(12)  # 96-bit nonce for AESGCM
+        ciphertext = self.aesgcm.encrypt(nonce, plaintext, None)
+        # ciphertext includes the tag at the end
+        # final message: nonce + ciphertext
+        combined = nonce + ciphertext
+        encoded = base64.b64encode(combined).decode('utf-8')
+        return encoded
+
+    def decrypt_message(self, encoded_message: str) -> dict:
+        """
+        Decrypt and verify a received message.
+        :param encoded_message: base64 encoded string
+        :return: original message dict
+        :raises MessageProtocolError on failure
+        """
+        try:
+            combined = base64.b64decode(encoded_message)
+            if len(combined) < 12 + 16:  # nonce + tag minimum
+                raise MessageProtocolError("Message too short")
+            nonce = combined[:12]
+            ciphertext = combined[12:]
+            plaintext = self.aesgcm.decrypt(nonce, ciphertext, None)
+            message = json.loads(plaintext.decode('utf-8'))
+            if not isinstance(message, dict):
+                raise MessageProtocolError("Decrypted message is not a dict")
+            return message
+        except (InvalidTag, ValueError, json.JSONDecodeError) as e:
+            raise MessageProtocolError(f"Message decryption or parsing failed: {e}")
+
+    def send_message(self, sender, receiver, message: dict):
+        """
+        Send a message from sender to receiver using the protocol.
+        :param sender: sending agent instance with a receive_message method
+        :param receiver: receiving agent instance
+        :param message: dict message
+        """
