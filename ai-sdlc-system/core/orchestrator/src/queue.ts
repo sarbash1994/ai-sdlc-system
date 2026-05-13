@@ -40,6 +40,24 @@ export function createPipelineQueue(_redisUrl: string): {
   };
 }
 
+export async function recoverStuckJobs(): Promise<number> {
+  const jobs = await readJobs();
+  let count = 0;
+  const timestamp = new Date().toISOString();
+  for (const job of jobs) {
+    if (job.status === "processing") {
+      job.status = "queued";
+      job.error = "recovered: worker restarted during processing";
+      job.updatedAt = timestamp;
+      count++;
+    }
+  }
+  if (count > 0) {
+    await writeJobs(jobs);
+  }
+  return count;
+}
+
 export async function claimNextLocalJob(): Promise<LocalQueueRecord | undefined> {
   const jobs = await readJobs();
   const index = jobs.findIndex((job) => job.status === "queued");

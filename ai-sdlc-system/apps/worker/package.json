@@ -14,6 +14,8 @@
     "@ai-sdlc/orchestrator": "0.1.0",
     "@ai-sdlc/tools": "0.1.0",
     "@ai-sdlc/types": "0.1.0",
+    "@ai-sdlc/llm": "0.1.0",
+    "@ai-sdlc/rag": "0.1.0",
     "bullmq": "^5.34.5"
   }
 }

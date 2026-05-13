@@ -5,13 +5,14 @@ import {
   claimNextLocalJob,
   completeLocalJob,
   failLocalJob,
+  recoverStuckJobs,
   JsonFileTaskStore,
   PIPELINE_QUEUE_NAME,
   PipelineOrchestrator
 } from "@ai-sdlc/orchestrator";
 import { createPullRequestFromDiffs } from "@ai-sdlc/tools";
 import { workerJobSchema } from "@ai-sdlc/types";
-
+import "./queues/pipeline.queue.js";
 const config = loadConfig();
 const taskStore = new JsonFileTaskStore("storage/tasks.json");
 const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
@@ -98,6 +99,11 @@ function requireEnv(name: string, value: string | undefined): string {
 
 console.log(`AI SDLC worker started: ${PIPELINE_QUEUE_NAME}`);
 logger.info({ queue: PIPELINE_QUEUE_NAME }, "AI SDLC worker started");
+
+const recovered = await recoverStuckJobs();
+if (recovered > 0) {
+  logger.warn({ count: recovered }, "recovered stuck processing jobs → re-queued");
+}
 
 setInterval(() => {
   processQueue().catch((error) => {

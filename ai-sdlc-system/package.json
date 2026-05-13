@@ -10,7 +10,7 @@
     "test": "vitest run",
     "dev:api": "node apps/api/src/index.mjs",
     "dev:bot": "node --import tsx apps/telegram-bot/src/index.ts",
-    "dev:worker": "node --import tsx apps/worker/src/index.ts",
+    "dev:worker": "node --watch --import tsx apps/worker/src/index.ts",
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {

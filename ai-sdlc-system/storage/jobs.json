@@ -6,9 +6,48 @@
       "kind": "run-pipeline",
       "taskId": "task_1778626994938_icqxct"
     },
-    "status": "processing",
+    "status": "failed",
     "attempts": 1,
     "createdAt": "2026-05-12T23:03:14.940Z",
-    "updatedAt": "2026-05-12T23:03:16.452Z"
+    "updatedAt": "2026-05-13T20:35:51.049337+00:00",
+    "error": "reset: worker crashed during processing"
+  },
+  {
+    "id": "job_1778703842435_tkuys3",
+    "name": "run-pipeline",
+    "data": {
+      "kind": "run-pipeline",
+      "taskId": "task_1778703839169_tu29zg"
+    },
+    "status": "failed",
+    "attempts": 1,
+    "createdAt": "2026-05-13T20:24:02.435Z",
+    "updatedAt": "2026-05-13T20:35:51.049482+00:00",
+    "error": "reset: worker crashed during processing"
+  },
+  {
+    "id": "job_1778704157531_46ne52",
+    "name": "run-pipeline",
+    "data": {
+      "kind": "run-pipeline",
+      "taskId": "task_1778704157529_ehs0z3"
+    },
+    "status": "failed",
+    "attempts": 1,
+    "createdAt": "2026-05-13T20:29:17.530Z",
+    "updatedAt": "2026-05-13T20:35:51.049484+00:00",
+    "error": "reset: worker crashed during processing"
+  },
+  {
+    "id": "job_1778704433113_6o8aoq",
+    "name": "run-pipeline",
+    "data": {
+      "kind": "run-pipeline",
+      "taskId": "task_1778704433112_mgtmnp"
+    },
+    "status": "completed",
+    "attempts": 2,
+    "createdAt": "2026-05-13T20:33:53.113Z",
+    "updatedAt": "2026-05-13T20:38:30.043Z"
   }
 ]

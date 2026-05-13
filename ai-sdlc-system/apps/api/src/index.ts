@@ -10,9 +10,8 @@ const [{ default: express }, { loadConfig }, { logger }, { createIdeaInputSchema
 
 console.log("AI SDLC API boot: base imports loaded");
 
-const [{ createPipelineQueue }, { JsonFileTaskStore }] = await Promise.all([
-  import("../../../core/orchestrator/src/queue.js"),
-  import("../../../core/orchestrator/src/task-store.js")
+const [{ JsonFileTaskStore, createPipelineQueue }] = await Promise.all([
+  import("@ai-sdlc/orchestrator")
 ]);
 
 console.log("AI SDLC API boot: queue/store imports loaded");
@@ -20,7 +19,7 @@ console.log("AI SDLC API boot: queue/store imports loaded");
 const config = loadConfig();
 const app = express();
 const taskStore = new JsonFileTaskStore("storage/tasks.json");
-const queue = createPipelineQueue(config.redisUrl);
+const localQueue = createPipelineQueue("");   // uses storage/jobs.json
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -39,9 +38,15 @@ app.get("/health", (_request, response) => {
 app.post("/ideas", async (request, response, next) => {
   try {
     const input = createIdeaInputSchema.parse(request.body);
-    const task = await taskStore.createTask(input);
-    await queue.add("run-pipeline", { kind: "run-pipeline", taskId: task.id });
-    response.status(202).json(task);
+
+    const task = await taskStore.createTask({
+      idea: input.idea,
+      telegramChatId: input.telegramChatId
+    });
+    await localQueue.add("run-pipeline", { kind: "run-pipeline", taskId: task.id });
+
+    logger.info({ taskId: task.id }, "task queued for pipeline");
+    response.status(202).json({ id: task.id, status: task.status });
   } catch (error) {
     next(error);
   }

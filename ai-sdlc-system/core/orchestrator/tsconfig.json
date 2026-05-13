@@ -8,7 +8,9 @@
     { "path": "../../packages/utils" },
     { "path": "../agents" },
     { "path": "../workflows" },
-    { "path": "../memory" }
+    { "path": "../memory" },
+    { "path": "../../packages/llm" },
+    { "path": "../../packages/rag" }
   ],
   "compilerOptions": {
     "rootDir": "src",

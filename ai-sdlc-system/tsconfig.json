@@ -12,7 +12,10 @@
     { "path": "core/memory" },
     { "path": "apps/api" },
     { "path": "apps/telegram-bot" },
-    { "path": "apps/worker" }
+    { "path": "apps/worker" },
+    { "path": "packages/validation" },
+    { "path": "packages/llm" },
+    { "path": "packages/rag" }
   ],
   "compilerOptions": {
     "target": "ES2022",

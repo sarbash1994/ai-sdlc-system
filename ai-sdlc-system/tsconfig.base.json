@@ -25,7 +25,10 @@
       "@ai-sdlc/tools": ["core/tools/src/index.ts"],
       "@ai-sdlc/workflows": ["core/workflows/src/index.ts"],
       "@ai-sdlc/orchestrator": ["core/orchestrator/src/index.ts"],
-      "@ai-sdlc/memory": ["core/memory/src/index.ts"]
+      "@ai-sdlc/memory": ["core/memory/src/index.ts"],
+      "@ai-sdlc/validation": ["packages/validation/src/index.ts"],
+      "@ai-sdlc/llm": ["packages/llm/src/index.ts"],
+      "@ai-sdlc/rag": ["packages/rag/src/index.ts"]
     }
   }
 }
