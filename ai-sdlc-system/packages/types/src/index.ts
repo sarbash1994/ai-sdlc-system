@@ -4,6 +4,7 @@ export const pipelineStageSchema = z.enum([
   "IDEA",
   "BA_ANALYSIS",
   "PM_PLANNING",
+  "ARCHITECTURE_COMMITTEE",
   "DEV_IMPLEMENTATION",
   "QA_AUTOMATION",
   "QA_MANUAL",
@@ -115,6 +116,14 @@ export const stageRecordSchema = z.object({
 
 export type StageRecord = z.infer<typeof stageRecordSchema>;
 
+export const committeeMessageSchema = z.object({
+  agent: z.string(),
+  message: z.string(),
+  vote: z.enum(["approve", "reject", "discuss"])
+});
+
+export type CommitteeMessage = z.infer<typeof committeeMessageSchema>;
+
 export const sdlcTaskSchema = z.object({
   id: z.string(),
   idea: z.string(),
@@ -132,7 +141,8 @@ export const sdlcTaskSchema = z.object({
   pullRequestUrl: z.string().url().optional(),
   clarifyingQuestions: z.array(z.string()).optional(),
   clarifyingAnswers: z.string().optional(),
-  qaAutomationOutput: qaAutomationOutputSchema.optional()
+  qaAutomationOutput: qaAutomationOutputSchema.optional(),
+  committeeDiscussion: z.array(committeeMessageSchema).optional()
 });
 
 export type SDLCTask = z.infer<typeof sdlcTaskSchema>;

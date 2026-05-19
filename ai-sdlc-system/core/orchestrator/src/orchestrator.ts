@@ -49,8 +49,13 @@ export class PipelineOrchestrator {
       task = await this.runPM(task);
     }
 
+    // Committee Stage
+    if ((task.currentStage === "PM_PLANNING" && task.status === "done") || (task.currentStage === "ARCHITECTURE_COMMITTEE" && task.status !== "done")) {
+      task = await this.runCommittee(task);
+    }
+
     // Dev Stage
-    if ((task.currentStage === "PM_PLANNING" && task.status === "done") || (task.currentStage === "DEV_IMPLEMENTATION" && task.status !== "done")) {
+    if ((task.currentStage === "ARCHITECTURE_COMMITTEE" && task.status === "done") || (task.currentStage === "DEV_IMPLEMENTATION" && task.status !== "done")) {
       task = await this.runBackendDev(task);
     }
     // QA Stage
@@ -157,6 +162,48 @@ export class PipelineOrchestrator {
       return task;
     } catch (error) {
       task = setStage(task, "PM_PLANNING", "failed");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+      throw error;
+    }
+  }
+
+  async runCommittee(task: SDLCTask): Promise<SDLCTask> {
+    console.log(`[Orchestrator] Running Committee for task ${task.id}`);
+    const { runCommitteeDebate } = await import("../../agents/src/committee-agent.js");
+    
+    if (!task.pmOutput) throw new Error("Missing PM output for Committee stage");
+
+    // Start debate only if not already waiting for approval
+    if (task.status !== "waiting_for_approval") {
+      task = setStage(task, "ARCHITECTURE_COMMITTEE", "running");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+    }
+
+    try {
+      const debateResult = await runCommitteeDebate({
+        client: this.client,
+        model: this.config.openaiModel,
+        task,
+        telegramChatId: task.telegramChatId,
+        telegramBotToken: this.config.telegramBotToken
+      });
+
+      task.committeeDiscussion = debateResult.discussion;
+      
+      if (debateResult.consensusReached) {
+        task = setStage(task, "ARCHITECTURE_COMMITTEE", "done");
+      } else {
+        // Escalate to human
+        task = setStage(task, "ARCHITECTURE_COMMITTEE", "waiting_for_approval");
+      }
+      
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+      return task;
+    } catch (error) {
+      task = setStage(task, "ARCHITECTURE_COMMITTEE", "failed");
       await this.taskStore.saveTask(task);
       await this.notify(task);
       throw error;

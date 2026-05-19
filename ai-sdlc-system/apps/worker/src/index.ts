@@ -113,6 +113,31 @@ async function main() {
           ]]
         };
       }
+    } else if (stage === "ARCHITECTURE_COMMITTEE") {
+      if (status === "running") {
+        emoji = "🏛️";
+        message = `${emoji} *Architecture Committee Debate Started* for task \`${task.id}\`...\nAgents are discussing the PM plan.`;
+      } else if (status === "waiting_for_approval") {
+        emoji = "⚖️";
+        message = `${emoji} *Committee Escalation* for task \`${task.id}\`\n\nThe agents failed to reach a consensus on the architecture.\n\nPlease review the discussion above and provide your decision or feedback by replying to this message. Or use the buttons to force approve the task.`;
+        reply_markup = {
+          inline_keyboard: [[
+            { text: "Force Approve", callback_data: `approve_${task.id}` },
+            { text: "Decline", callback_data: `decline_${task.id}` }
+          ]]
+        };
+      } else if (status === "done") {
+        emoji = "🤝";
+        message = `${emoji} *Consensus Reached!* The committee approved the architecture. Moving to development...`;
+      }
+    } else if (stage === "QA_AUTOMATION") {
+      if (status === "running") {
+        emoji = "🧪";
+        message = `${emoji} *QA Automation Started* for task \`${task.id}\`...`;
+      } else if (status === "done") {
+        emoji = "✅";
+        message = `${emoji} *QA Automation Passed* for task \`${task.id}\`!\nAutomated tests were written and verified.`;
+      }
     } else if (stage === "DEV_IMPLEMENTATION") {
       if (status === "running") {
         emoji = "🛠️";

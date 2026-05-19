@@ -75,23 +75,38 @@ const server = createServer(async (request, response) => {
         }
 
         const task = tasks[taskIndex];
-        if (task.clarifyingAnswers) {
-          task.clarifyingAnswers = `${task.clarifyingAnswers}\nUser feedback: ${answers}`;
-        } else {
-          task.clarifyingAnswers = answers;
-        }
-        task.status = "queued";
         task.updatedAt = new Date().toISOString();
-        task.stages = task.stages.map((record) => {
-          if (record.name === "BA_ANALYSIS") {
-            return {
-              ...record,
-              status: "queued"
-            };
+        if (task.currentStage === "ARCHITECTURE_COMMITTEE") {
+          const committeeMsg = {
+            agent: "Customer",
+            message: answers,
+            vote: "discuss"
+          };
+          task.committeeDiscussion = task.committeeDiscussion || [];
+          task.committeeDiscussion.push(committeeMsg);
+          task.status = "queued";
+          task.stages = task.stages.map((record) => {
+            if (record.name === "ARCHITECTURE_COMMITTEE") {
+              return { ...record, status: "queued" };
+            }
+            return record;
+          });
+          task.logs.push(`${task.updatedAt} Customer feedback received, resuming ARCHITECTURE_COMMITTEE`);
+        } else {
+          if (task.clarifyingAnswers) {
+            task.clarifyingAnswers = `${task.clarifyingAnswers}\nUser feedback: ${answers}`;
+          } else {
+            task.clarifyingAnswers = answers;
           }
-          return record;
-        });
-        task.logs.push(`${task.updatedAt} Clarifying answers/feedback received, re-queueing BA_ANALYSIS`);
+          task.status = "queued";
+          task.stages = task.stages.map((record) => {
+            if (record.name === "BA_ANALYSIS") {
+              return { ...record, status: "queued" };
+            }
+            return record;
+          });
+          task.logs.push(`${task.updatedAt} Clarifying answers/feedback received, re-queueing BA_ANALYSIS`);
+        }
 
         await writeJsonArray(taskPath, tasks);
         await enqueueJob("run-pipeline", { kind: "run-pipeline", taskId: task.id });
