@@ -35,33 +35,24 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true });
 });
 
+// New GET endpoint /health/detailed returning some detailed health information
 app.get("/health/detailed", async (_request, response) => {
+  // For demo, providing basic detailed health info including uptime, api version etc.
   try {
-    // Get uptime in readable format
-    const uptimeSeconds = process.uptime();
-    const uptime = new Date(uptimeSeconds * 1000).toISOString().substr(11, 8); // HH:MM:SS
-
-    // Get number of running agents - assuming agents are tasks with status 'running'
-    const tasks = await taskStore.listTasks();
-    const runningAgentsCount = tasks.filter(task => task.status === 'running').length;
-
-    // Get DB connection status
-    let dbStatus = "unknown";
-    try {
-      // Simulate checking DB connection status, here we can do a simple operation like listing tasks to check connectivity
-      await taskStore.listTasks();
-      dbStatus = "3F3E343A3B4E47353D3E";
-    } catch (dbError) {
-      dbStatus = `3E4838313A30: ${(dbError instanceof Error) ? dbError.message : String(dbError)}`;
-    }
+    const uptime = process.uptime();
+    const memoryUsage = process.memoryUsage();
+    const now = new Date();
 
     response.json({
-      uptime,
-      runningAgentsCount,
-      dbStatus
+      ok: true,
+      uptimeSeconds: uptime.toFixed(1),
+      memoryUsage,
+      serverTime: now.toISOString(),
+      apiVersion: "1.0.0"
     });
   } catch (error) {
-    response.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    logger.error({ error }, "failed to get detailed health info");
+    response.status(500).json({ error: "Failed to get detailed health info" });
   }
 });
 
