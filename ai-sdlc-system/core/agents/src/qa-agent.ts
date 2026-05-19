@@ -5,9 +5,9 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import OpenAI from "openai";
 import {
-  backendDevOutputSchema,
-  type BackendDevOutput,
-  type PMTask
+  qaAutomationOutputSchema,
+  type QAAutomationOutput,
+  type SDLCTask
 } from "@ai-sdlc/types";
 
 const execAsync = promisify(exec);
@@ -210,15 +210,14 @@ const tools = [
   }
 ];
 
-export async function runBackendDevAgent(params: {
+export async function runQAAgent(params: {
   client: OpenAI;
   model: string;
-  task: PMTask;
+  task: SDLCTask;
   codeContext: string;
-  branchHint: string;
-}): Promise<BackendDevOutput> {
-  const tempDir = await mkdtemp(join(tmpdir(), "ai-sdlc-dev-agent-"));
-  console.log(`[Backend Dev Agent] Sandboxing workspace in: ${tempDir}`);
+}): Promise<QAAutomationOutput> {
+  const tempDir = await mkdtemp(join(tmpdir(), "ai-sdlc-qa-agent-"));
+  console.log(`[QA Agent] Sandboxing workspace in: ${tempDir}`);
 
   // Copy current workspace except node_modules/git/storage/temp directories
   await cp(process.cwd(), tempDir, {
@@ -229,40 +228,46 @@ export async function runBackendDevAgent(params: {
         name.includes("node_modules") ||
         name.includes(".git") ||
         name.includes("storage") ||
-        name.includes("ai-sdlc-dev-agent");
+        name.includes("ai-sdlc-");
       return !isIgnored;
     }
   });
+
+  // Apply the developer's changes so the QA agent is testing the new code
+  if (params.task.backendDevOutput?.changes) {
+    for (const change of params.task.backendDevOutput.changes) {
+      await writeAgentFile(change.file, change.diff, tempDir);
+    }
+  }
 
   // Symlink node_modules to make workspace fully functional immediately
   try {
     await symlink(join(process.cwd(), "node_modules"), join(tempDir, "node_modules"));
   } catch (err) {
-    console.warn("[Backend Dev Agent] Failed to symlink node_modules, continuing without it:", err);
+    console.warn("[QA Agent] Failed to symlink node_modules, continuing without it:", err);
   }
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: `You are an advanced backend developer agent. You have access to tools to read, write, search, and run tests/builds in an isolated workspace.
-Your task is to implement the given backend task.
+      content: `You are an advanced QA Automation agent. You have access to tools to read, write, search, and run tests in an isolated workspace.
+Your task is to write automated tests for the recently implemented feature.
 
 Follow this process:
-1. Use 'list_files' or 'grep_search' to find the files you need to modify.
-2. Use 'read_file' to view the content of those files and understand their structure and dependencies.
-3. Make changes by using 'write_file' to write the updated file contents.
-4. Run 'run_command' with 'npm run build', 'npm run lint', or 'npm test' to verify that your code compiles, satisfies the linter rules, and all tests pass.
-5. If there are any compiler/test errors, read them carefully, modify the files to fix the issues, and run the command again.
-6. Once the code compiles successfully, all tests pass, and you are confident in your solution, return the final output as a JSON object matching the required schema. Do NOT make any more tool calls after returning the final JSON.
+1. Use 'list_files' or 'grep_search' to explore the codebase and find the files modified by the developer.
+2. Use 'read_file' to view the content of those files and understand the new logic.
+3. Write automated tests (e.g., unit tests or integration tests) by using 'write_file' or 'edit_file' to create or modify test files (*.test.ts).
+4. Run 'run_command' with 'npm test' or the appropriate test command to verify that your tests pass.
+5. If tests fail, read the error output carefully, modify the test files or code, and run the command again.
+6. Once tests pass and you are confident in your coverage, return the final output as a JSON object matching the required schema. Do NOT make any more tool calls after returning the final JSON.
 
 The final JSON output must conform to this schema:
 {
-  "branch": "feature/branch-name",
   "changes": [
     {
-      "file": "relative/path/to/file",
-      "diff": "FULL FILE CONTENT HERE (the entire code of the file including your changes)",
-      "rationale": "Description of what was changed and why"
+      "file": "relative/path/to/test/file.test.ts",
+      "content": "FULL FILE CONTENT HERE",
+      "rationale": "Description of what was tested and why"
     }
   ],
   "commands": ["npm test"]
@@ -270,7 +275,7 @@ The final JSON output must conform to this schema:
     },
     {
       "role": "user",
-      "content": `Backend task:\n${JSON.stringify(params.task, null, 2)}\n\nRelevant code context:\n${params.codeContext}\n\nUse branch name: ${params.branchHint}`
+      "content": `Task idea:\n${params.task.idea}\n\nDeveloper changes summary:\n${params.task.backendDevOutput?.changes.map(c => c.file).join(", ") || "None"}\n\nRelevant code context:\n${params.codeContext}`
     }
   ];
 
@@ -298,7 +303,7 @@ The final JSON output must conform to this schema:
       messages.push(message);
 
       if (message.tool_calls && message.tool_calls.length > 0) {
-        console.log(`[Backend Dev Agent] Turn ${turns}: calling ${message.tool_calls.length} tools`);
+        console.log(`[QA Agent] Turn ${turns}: calling ${message.tool_calls.length} tools`);
         for (const toolCall of message.tool_calls) {
           const name = toolCall.function.name;
           const args = JSON.parse(toolCall.function.arguments);
@@ -335,13 +340,13 @@ The final JSON output must conform to this schema:
         // No more tool calls, parse and return the final JSON response!
         const content = message.content || "{}";
         const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
-        console.log(`[Backend Dev Agent] Final Turn output received.`);
+        console.log(`[QA Agent] Final Turn output received.`);
         try {
           const json = JSON.parse(cleaned);
-          const parsed = backendDevOutputSchema.parse(json);
+          const parsed = qaAutomationOutputSchema.parse(json);
           return parsed;
         } catch (err) {
-          console.error(`[Backend Dev Agent] Schema validation failed:`, err);
+          console.error(`[QA Agent] Schema validation failed:`, err);
           messages.push({
             role: "user",
             content: `Your final output did not conform to the schema: ${(err as Error).message}. Please correct it and output the valid JSON matching the schema.`
@@ -349,11 +354,11 @@ The final JSON output must conform to this schema:
         }
       }
     }
-    throw new Error("Backend Dev Agent exceeded maximum execution turns.");
+    throw new Error("QA Agent exceeded maximum execution turns.");
   } finally {
     // Always clean up the temporary workspace
     await rm(tempDir, { recursive: true, force: true }).catch((err) => {
-      console.warn(`[Backend Dev Agent] Failed to clean up tempDir: ${tempDir}`, err);
+      console.warn(`[QA Agent] Failed to clean up tempDir: ${tempDir}`, err);
     });
   }
 }

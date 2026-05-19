@@ -75,8 +75,14 @@ export const backendDevOutputSchema = z.object({
 export type BackendDevOutput = z.infer<typeof backendDevOutputSchema>;
 
 export const qaAutomationOutputSchema = z.object({
-  playwright_tests: z.array(z.string()).default([]),
-  test_data: z.array(z.record(z.unknown())).default([])
+  changes: z.array(
+    z.object({
+      file: z.string().min(1),
+      content: z.string().min(1),
+      rationale: z.string().min(1)
+    })
+  ).min(1),
+  commands: z.array(z.string()).default([])
 });
 
 export type QAAutomationOutput = z.infer<typeof qaAutomationOutputSchema>;
@@ -125,7 +131,8 @@ export const sdlcTaskSchema = z.object({
   backendDevOutput: backendDevOutputSchema.optional(),
   pullRequestUrl: z.string().url().optional(),
   clarifyingQuestions: z.array(z.string()).optional(),
-  clarifyingAnswers: z.string().optional()
+  clarifyingAnswers: z.string().optional(),
+  qaAutomationOutput: qaAutomationOutputSchema.optional()
 });
 
 export type SDLCTask = z.infer<typeof sdlcTaskSchema>;

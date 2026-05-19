@@ -29,10 +29,13 @@ async function main() {
   const { workerJobSchema } = await import("../../../packages/types/src/index.js");
   console.log(">>> TYPES MODULE LOADED.");
 
-  const { EmptyRetriever } = await import("../../../core/memory/src/index.js");
+  const { LLMCodeRetriever } = await import("../../../core/memory/src/index.js");
+  const { default: OpenAI } = await import("openai");
   
   const taskStore = new JsonFileTaskStore("storage/tasks.json");
-  const orchestrator = new PipelineOrchestrator(config, taskStore, new EmptyRetriever());
+  const openAIClient = new OpenAI({ apiKey: config.openaiApiKey });
+  const retriever = new LLMCodeRetriever(openAIClient, config.openaiModel);
+  const orchestrator = new PipelineOrchestrator(config, taskStore, retriever);
 
   console.log(">>> ALL INITIALIZED. STARTING POLLING...");
 
@@ -49,6 +52,8 @@ async function main() {
     if (status === "running") emoji = "🚀";
     let message = `${emoji} *Task Update*\n\n*ID:* \`${task.id}\`\n*Stage:* \`${stage}\`\n*Status:* \`${status}\``;
     
+    let reply_markup = undefined;
+
     if (stage === "BA_ANALYSIS") {
       if (status === "waiting_for_approval") {
         if (task.baOutput) {
@@ -65,7 +70,14 @@ async function main() {
             task.baOutput.edge_cases.map((ec) => `- ${ec}`).join("\n") +
             `\n\n*Assumptions:*\n` +
             task.baOutput.assumptions.map((a) => `- ${a}`).join("\n") +
-            `\n\n💬 Reply to this message to discuss or modify the requirements, or send \`/approve\` to proceed to Project Planning.`;
+            `\n\n💬 Reply to this message to discuss or modify the requirements, or use the buttons below to proceed.`;
+            
+          reply_markup = {
+            inline_keyboard: [[
+              { text: "Approve", callback_data: `approve_${task.id}` },
+              { text: "Decline", callback_data: `decline_${task.id}` }
+            ]]
+          };
         } else if (task.clarifyingQuestions?.length) {
           emoji = "❓";
           message = `${emoji} *Clarifying Questions for Task* \`${task.id}\`\n\n` +
@@ -92,7 +104,14 @@ async function main() {
             const effort = t.estimated_effort ? ` (Effort: *${t.estimated_effort}*)` : "";
             return `*${idx + 1}.* [${t.type.toUpperCase()}] *${t.title || t.description}*${effort}\n   _${t.description}_`;
           }).join("\n\n") +
-          `\n\n✅ Send \`/approve\` to approve the plan and begin development implementation.`;
+          `\n\n✅ Use the buttons below to approve the plan and begin development implementation.`;
+          
+        reply_markup = {
+          inline_keyboard: [[
+            { text: "Approve", callback_data: `approve_${task.id}` },
+            { text: "Decline", callback_data: `decline_${task.id}` }
+          ]]
+        };
       }
     } else if (stage === "DEV_IMPLEMENTATION") {
       if (status === "running") {
@@ -115,10 +134,15 @@ async function main() {
     
     console.log(`>>> Sending Telegram notification for task ${task.id} (Stage: ${stage}, Status: ${status}) to ${task.telegramChatId}...`);
     try {
+      const bodyPayload: any = { chat_id: task.telegramChatId, text: message, parse_mode: "Markdown" };
+      if (reply_markup) {
+        bodyPayload.reply_markup = reply_markup;
+      }
+
       const res = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: task.telegramChatId, text: message, parse_mode: "Markdown" })
+        body: JSON.stringify(bodyPayload)
       });
       if (!res.ok) {
         const errorText = await res.text();

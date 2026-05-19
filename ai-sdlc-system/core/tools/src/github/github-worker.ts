@@ -63,6 +63,30 @@ export async function createPullRequestFromDiffs(
   };
 }
 
+export async function pushChangesToBranch(
+  config: GitHubWorkerConfig,
+  branchName: string,
+  changes: { file: string; content: string }[],
+  commitMessage: string
+): Promise<void> {
+  const workdir = await mkdtemp(join(tmpdir(), `ai-sdlc-push-`));
+  const repoUrl = `https://x-access-token:${config.token}@github.com/${config.owner}/${config.repo}.git`;
+
+  await git(["clone", repoUrl, "."], workdir);
+  await git(["checkout", branchName], workdir);
+
+  for (const change of changes) {
+    const filePath = join(workdir, change.file);
+    const dir = dirname(filePath);
+    await mkdir(dir, { recursive: true });
+    await writeFile(filePath, change.content, "utf8");
+  }
+
+  await git(["add", "."], workdir);
+  await git(["commit", "-m", commitMessage], workdir);
+  await git(["push", "origin", branchName], workdir);
+}
+
 function buildPullRequestBody(input: CreatePullRequestInput): string {
   const changes = input.devOutput.changes
     .map((change) => `- \`${change.file}\`: ${change.rationale}`)

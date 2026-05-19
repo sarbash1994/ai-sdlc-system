@@ -53,8 +53,12 @@ export class PipelineOrchestrator {
     if ((task.currentStage === "PM_PLANNING" && task.status === "done") || (task.currentStage === "DEV_IMPLEMENTATION" && task.status !== "done")) {
       task = await this.runBackendDev(task);
     }
+    // QA Stage
+    if ((task.currentStage === "DEV_IMPLEMENTATION" && task.status === "done") || (task.currentStage === "QA_AUTOMATION" && task.status !== "done")) {
+      task = await this.runQA(task);
+    }
     
-    if (task.currentStage === "DEV_IMPLEMENTATION" && task.status === "done") {
+    if (task.currentStage === "QA_AUTOMATION" && task.status === "done") {
       task = setStage(task, "DONE", "done");
       await this.taskStore.saveTask(task);
       await this.notify(task);
@@ -219,6 +223,64 @@ export class PipelineOrchestrator {
     } catch (error) {
       console.error("[Orchestrator] Backend Dev failed:", error);
       task = setStage(task, "DEV_IMPLEMENTATION", "failed");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+      throw error;
+    }
+  }
+
+  async runQA(task: SDLCTask): Promise<SDLCTask> {
+    console.log(`[Orchestrator] Running QA for task ${task.id}`);
+    const { runQAAgent } = await import("../../agents/src/qa-agent.js");
+    const { formatRetrievedContext } = await import("../../memory/src/index.js");
+
+    if (!task.backendDevOutput) {
+      console.log("[Orchestrator] No backend output found, skipping QA");
+      task = setStage(task, "QA_AUTOMATION", "done");
+      await this.taskStore.saveTask(task);
+      return task;
+    }
+
+    task = setStage(task, "QA_AUTOMATION", "running");
+    await this.taskStore.saveTask(task);
+    await this.notify(task);
+
+    try {
+      const context = await this.retriever.retrieve(task.idea + " write automated tests for these changes");
+      const formattedContext = formatRetrievedContext(context);
+
+      const qaOutput = await runQAAgent({
+        client: this.client,
+        model: this.config.openaiModel,
+        task: task,
+        codeContext: formattedContext
+      });
+
+      const { pushChangesToBranch } = await import("../../tools/src/index.js");
+      
+      if (task.backendDevOutput?.branch) {
+         await pushChangesToBranch(
+           {
+             token: this.config.githubToken || "",
+             owner: this.config.githubOwner || "",
+             repo: this.config.githubRepo || "",
+             defaultBranch: this.config.githubDefaultBranch
+           },
+           task.backendDevOutput.branch,
+           qaOutput.changes,
+           `AI SDLC QA: Added tests for ${task.id}`
+         );
+      }
+
+      task.qaAutomationOutput = qaOutput;
+      task.logs.push(`${nowIso()} QA Automation tests pushed to PR branch.`);
+      task = setStage(task, "QA_AUTOMATION", "done");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+      return task;
+    } catch (error) {
+      console.error("[Orchestrator] QA Automation failed:", error);
+      task = setStage(task, "QA_AUTOMATION", "failed");
       await this.taskStore.saveTask(task);
       await this.notify(task);
       throw error;

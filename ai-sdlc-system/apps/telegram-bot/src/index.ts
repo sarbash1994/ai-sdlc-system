@@ -155,16 +155,14 @@ bot.command("answer", async (ctx) => {
   await submitAnswers(ctx, activeTask.id, text);
 });
 
-bot.command("approve", async (ctx) => {
-  const activeTask = await findActiveTaskWaitingForApproval(ctx.chat.id);
-  if (!activeTask) {
-    await ctx.reply("No task is currently waiting for approval in this chat.");
-    return;
-  }
+bot.action(/^approve_(.+)$/, async (ctx) => {
+  const taskId = ctx.match[1];
+  if (!taskId) return;
 
   try {
-    await ctx.reply(`Approving task ${activeTask.id}...`);
-    const response = await fetch(`${config.apiBaseUrl}/tasks/${encodeURIComponent(activeTask.id)}/approve`, {
+    await ctx.answerCbQuery();
+    await ctx.reply(`Approving task ${taskId}...`);
+    const response = await fetch(`${config.apiBaseUrl}/tasks/${encodeURIComponent(taskId)}/approve`, {
       method: "POST",
       headers: { "content-type": "application/json" }
     });
@@ -174,11 +172,22 @@ bot.command("approve", async (ctx) => {
       return;
     }
 
-    await ctx.reply(`Task ${activeTask.id} approved! Continuing to the next stage...`);
+    await ctx.reply(`Task ${taskId} approved! Continuing to the next stage...`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ error: message }, "telegram approve failed");
     await ctx.reply(`Error approving task: ${message}`);
+  }
+});
+
+bot.action(/^decline_(.+)$/, async (ctx) => {
+  const taskId = ctx.match[1];
+  if (!taskId) return;
+  try {
+    await ctx.answerCbQuery("Task declined");
+    await ctx.reply(`Task ${taskId} was declined. Please provide feedback on how to proceed, or use /idea to start a new one.`);
+  } catch (error) {
+    logger.error({ error }, "telegram decline failed");
   }
 });
 

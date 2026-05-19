@@ -1,4 +1,4 @@
-export { createPullRequestFromDiffs } from "./github/github-worker.js";
+export { createPullRequestFromDiffs, pushChangesToBranch } from "./github/github-worker.js";
 export type {
   CreatePullRequestInput,
   GitHubWorkerConfig,
