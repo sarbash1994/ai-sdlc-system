@@ -123,6 +123,7 @@ async function main() {
         reply_markup = {
           inline_keyboard: [[
             { text: "Force Approve", callback_data: `approve_${task.id}` },
+            { text: "Revise Plan", callback_data: `revise_${task.id}` },
             { text: "Decline", callback_data: `decline_${task.id}` }
           ]]
         };

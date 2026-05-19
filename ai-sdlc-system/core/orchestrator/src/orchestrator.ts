@@ -152,7 +152,8 @@ export class PipelineOrchestrator {
       const pmOutput = await runPMAgent({
         client: this.client,
         model: this.config.openaiModel,
-        baOutput: task.baOutput!
+        baOutput: task.baOutput!,
+        committeeDiscussion: task.committeeDiscussion
       });
 
       task.pmOutput = pmOutput;

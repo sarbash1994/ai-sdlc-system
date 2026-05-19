@@ -149,6 +149,40 @@ const server = createServer(async (request, response) => {
         return;
       }
     }
+    if (request.method === "POST" && url.pathname.startsWith("/tasks/") && url.pathname.endsWith("/revise")) {
+      const parts = url.pathname.split("/");
+      if (parts.length === 4 && parts[1] === "tasks" && parts[3] === "revise") {
+        const taskId = decodeURIComponent(parts[2]);
+        const tasks = await readJsonArray(taskPath);
+        const taskIndex = tasks.findIndex((candidate) => candidate.id === taskId);
+        if (taskIndex === -1) {
+          sendJson(response, 404, { error: "Task not found" });
+          return;
+        }
+
+        const task = tasks[taskIndex];
+        const now = new Date().toISOString();
+        
+        task.currentStage = "PM_PLANNING";
+        task.status = "queued";
+        task.updatedAt = now;
+        task.stages = task.stages.map((record) => {
+          if (record.name === "PM_PLANNING" || record.name === "ARCHITECTURE_COMMITTEE") {
+            return {
+              ...record,
+              status: "queued"
+            };
+          }
+          return record;
+        });
+        task.logs.push(`${now} Committee requested plan revision, rewinding to PM_PLANNING`);
+
+        await writeJsonArray(taskPath, tasks);
+        await enqueueJob("run-pipeline", { kind: "run-pipeline", taskId: task.id });
+        sendJson(response, 200, task);
+        return;
+      }
+    }
 
     sendJson(response, 404, {
       error: "Route not found",

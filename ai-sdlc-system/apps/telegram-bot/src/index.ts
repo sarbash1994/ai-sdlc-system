@@ -180,6 +180,31 @@ bot.action(/^approve_(.+)$/, async (ctx) => {
   }
 });
 
+bot.action(/^revise_(.+)$/, async (ctx) => {
+  const taskId = ctx.match[1];
+  if (!taskId) return;
+
+  try {
+    await ctx.answerCbQuery();
+    await ctx.reply(`Sending task ${taskId} back to PM for revision...`);
+    const response = await fetch(`${config.apiBaseUrl}/tasks/${encodeURIComponent(taskId)}/revise`, {
+      method: "POST",
+      headers: { "content-type": "application/json" }
+    });
+
+    if (!response.ok) {
+      await ctx.reply(`Could not revise plan: ${await response.text()}`);
+      return;
+    }
+
+    await ctx.reply(`Task ${taskId} is being revised by PM!`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error: message }, "telegram revise failed");
+    await ctx.reply(`Error revising task: ${message}`);
+  }
+});
+
 bot.action(/^decline_(.+)$/, async (ctx) => {
   const taskId = ctx.match[1];
   if (!taskId) return;
