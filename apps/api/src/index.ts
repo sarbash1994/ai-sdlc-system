@@ -23,49 +23,6 @@ const localQueue = createPipelineQueue("");   // uses storage/jobs.json
 
 app.use(express.json({ limit: "1mb" }));
 
-// Logging middleware for all requests
-app.use((request, response, next) => {
-  const start = process.hrtime();
-
-  // Listening for the finish event on response to log info after response sent
-  response.on('finish', () => {
-    const diff = process.hrtime(start);
-    let durationMs: number | string;
-    if (diff) {
-      durationMs = Math.round(diff[0] * 1000 + diff[1] / 1000000);
-    } else {
-      durationMs = 'unavailable';
-    }
-
-    // Get client IP address heuristically
-    let ip = request.ip || request.connection?.remoteAddress || 'unknown';
-
-    // Ensure IP is string and not empty
-    if (!ip || typeof ip !== 'string') {
-      ip = 'unknown';
-    }
-
-    // Compose log object
-    const logObj = {
-      url: request.originalUrl || request.url || 'unknown',
-      method: request.method || 'unknown',
-      ip,
-      responseTimeMs: durationMs
-    };
-
-    logger.info(logObj, "http request");
-    // Also output to console as JSON
-    // Using try-catch to avoid any unexpected errors
-    try {
-      console.log(JSON.stringify(logObj));
-    } catch {
-      // ignore
-    }
-  });
-
-  next();
-});
-
 app.use((request, _response, next) => {
   logger.info(
     { method: request.method, path: request.path },
@@ -114,6 +71,34 @@ app.get("/tasks/:taskId", async (request, response, next) => {
     response.json(task);
   } catch (error) {
     next(error);
+  }
+});
+
+// New endpoint /stats to provide task status counts
+app.get("/stats", async (_request, response, next) => {
+  try {
+    const tasks = await taskStore.listTasks();
+
+    // Define all possible statuses
+    const statuses = ["queued", "running", "waiting_for_approval", "failed", "done"];
+
+    // Count tasks by status
+    const stats = statuses.reduce((acc, status) => {
+      acc[status] = 0;
+      return acc;
+    }, {} as Record<string, number>);
+
+    for (const task of tasks) {
+      if (statuses.includes(task.status)) {
+        stats[task.status] += 1;
+      }
+    }
+
+    response.json(stats);
+  } catch (error) {
+    // Log error and return informative message
+    logger.error({ error }, "Failed to fetch task stats");
+    response.status(500).json({ error: "Failed to retrieve task statistics" });
   }
 });
 
