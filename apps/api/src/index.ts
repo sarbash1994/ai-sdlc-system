@@ -35,6 +35,36 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true });
 });
 
+app.get("/health/detailed", async (_request, response) => {
+  try {
+    // Get uptime in readable format
+    const uptimeSeconds = process.uptime();
+    const uptime = new Date(uptimeSeconds * 1000).toISOString().substr(11, 8); // HH:MM:SS
+
+    // Get number of running agents - assuming agents are tasks with status 'running'
+    const tasks = await taskStore.listTasks();
+    const runningAgentsCount = tasks.filter(task => task.status === 'running').length;
+
+    // Get DB connection status
+    let dbStatus = "unknown";
+    try {
+      // Simulate checking DB connection status, here we can do a simple operation like listing tasks to check connectivity
+      await taskStore.listTasks();
+      dbStatus = "3F3E343A3B4E47353D3E";
+    } catch (dbError) {
+      dbStatus = `3E4838313A30: ${(dbError instanceof Error) ? dbError.message : String(dbError)}`;
+    }
+
+    response.json({
+      uptime,
+      runningAgentsCount,
+      dbStatus
+    });
+  } catch (error) {
+    response.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 app.post("/ideas", async (request, response, next) => {
   try {
     const input = createIdeaInputSchema.parse(request.body);
@@ -71,34 +101,6 @@ app.get("/tasks/:taskId", async (request, response, next) => {
     response.json(task);
   } catch (error) {
     next(error);
-  }
-});
-
-// New endpoint /stats to provide task status counts
-app.get("/stats", async (_request, response, next) => {
-  try {
-    const tasks = await taskStore.listTasks();
-
-    // Define all possible statuses
-    const statuses = ["queued", "running", "waiting_for_approval", "failed", "done"];
-
-    // Count tasks by status
-    const stats = statuses.reduce((acc, status) => {
-      acc[status] = 0;
-      return acc;
-    }, {} as Record<string, number>);
-
-    for (const task of tasks) {
-      if (statuses.includes(task.status)) {
-        stats[task.status] += 1;
-      }
-    }
-
-    response.json(stats);
-  } catch (error) {
-    // Log error and return informative message
-    logger.error({ error }, "Failed to fetch task stats");
-    response.status(500).json({ error: "Failed to retrieve task statistics" });
   }
 });
 
