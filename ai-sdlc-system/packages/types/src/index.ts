@@ -49,7 +49,8 @@ export const pmTaskSchema = z.object({
   title: z.string().optional(),
   description: z.string().min(1),
   acceptance_criteria: z.array(z.string()).min(1),
-  dependencies: z.array(z.string()).default([])
+  dependencies: z.array(z.string()).default([]),
+  estimated_effort: z.string().optional()
 });
 
 export const pmOutputSchema = z.object({
@@ -122,7 +123,9 @@ export const sdlcTaskSchema = z.object({
   baOutput: baOutputSchema.optional(),
   pmOutput: pmOutputSchema.optional(),
   backendDevOutput: backendDevOutputSchema.optional(),
-  pullRequestUrl: z.string().url().optional()
+  pullRequestUrl: z.string().url().optional(),
+  clarifyingQuestions: z.array(z.string()).optional(),
+  clarifyingAnswers: z.string().optional()
 });
 
 export type SDLCTask = z.infer<typeof sdlcTaskSchema>;

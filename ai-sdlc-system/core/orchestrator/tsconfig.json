@@ -9,6 +9,7 @@
     { "path": "../agents" },
     { "path": "../workflows" },
     { "path": "../memory" },
+    { "path": "../tools" },
     { "path": "../../packages/llm" },
     { "path": "../../packages/rag" }
   ],

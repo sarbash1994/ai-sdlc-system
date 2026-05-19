@@ -17,4 +17,6 @@ export type CreatePullRequestInput = {
   taskId: string;
   idea: string;
   devOutput: BackendDevOutput;
+  prTitle?: string;
+  prBody?: string;
 };

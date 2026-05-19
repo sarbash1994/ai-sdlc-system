@@ -56,6 +56,85 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && url.pathname.startsWith("/tasks/") && url.pathname.endsWith("/answers")) {
+      const parts = url.pathname.split("/");
+      if (parts.length === 4 && parts[1] === "tasks" && parts[3] === "answers") {
+        const taskId = decodeURIComponent(parts[2]);
+        const body = await readRequestJson(request);
+        const answers = typeof body.answers === "string" ? body.answers.trim() : "";
+        if (!answers) {
+          sendJson(response, 400, { error: "answers must not be empty" });
+          return;
+        }
+
+        const tasks = await readJsonArray(taskPath);
+        const taskIndex = tasks.findIndex((candidate) => candidate.id === taskId);
+        if (taskIndex === -1) {
+          sendJson(response, 404, { error: "Task not found" });
+          return;
+        }
+
+        const task = tasks[taskIndex];
+        if (task.clarifyingAnswers) {
+          task.clarifyingAnswers = `${task.clarifyingAnswers}\nUser feedback: ${answers}`;
+        } else {
+          task.clarifyingAnswers = answers;
+        }
+        task.status = "queued";
+        task.updatedAt = new Date().toISOString();
+        task.stages = task.stages.map((record) => {
+          if (record.name === "BA_ANALYSIS") {
+            return {
+              ...record,
+              status: "queued"
+            };
+          }
+          return record;
+        });
+        task.logs.push(`${task.updatedAt} Clarifying answers/feedback received, re-queueing BA_ANALYSIS`);
+
+        await writeJsonArray(taskPath, tasks);
+        await enqueueJob("run-pipeline", { kind: "run-pipeline", taskId: task.id });
+        sendJson(response, 200, task);
+        return;
+      }
+    }
+
+    if (request.method === "POST" && url.pathname.startsWith("/tasks/") && url.pathname.endsWith("/approve")) {
+      const parts = url.pathname.split("/");
+      if (parts.length === 4 && parts[1] === "tasks" && parts[3] === "approve") {
+        const taskId = decodeURIComponent(parts[2]);
+        const tasks = await readJsonArray(taskPath);
+        const taskIndex = tasks.findIndex((candidate) => candidate.id === taskId);
+        if (taskIndex === -1) {
+          sendJson(response, 404, { error: "Task not found" });
+          return;
+        }
+
+        const task = tasks[taskIndex];
+        const now = new Date().toISOString();
+        
+        task.status = "done";
+        task.updatedAt = now;
+        task.stages = task.stages.map((record) => {
+          if (record.name === task.currentStage) {
+            return {
+              ...record,
+              status: "done",
+              finishedAt: now
+            };
+          }
+          return record;
+        });
+        task.logs.push(`${now} Approved stage ${task.currentStage}, marking as done`);
+
+        await writeJsonArray(taskPath, tasks);
+        await enqueueJob("run-pipeline", { kind: "run-pipeline", taskId: task.id });
+        sendJson(response, 200, task);
+        return;
+      }
+    }
+
     sendJson(response, 404, {
       error: "Route not found",
       method: request.method,

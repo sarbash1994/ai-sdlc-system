@@ -50,10 +50,10 @@ export async function createPullRequestFromDiffs(
   const pr = await octokit.pulls.create({
     owner: config.owner,
     repo: config.repo,
-    title: `AI SDLC: ${input.idea.slice(0, 80)}`,
+    title: input.prTitle || `AI SDLC: ${input.idea.slice(0, 80)}`,
     head: input.devOutput.branch,
     base: config.defaultBranch,
-    body: buildPullRequestBody(input)
+    body: input.prBody || buildPullRequestBody(input)
   });
 
   return {

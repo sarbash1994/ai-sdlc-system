@@ -7,10 +7,10 @@ async function main() {
   console.log(">>> CONFIG READY.");
 
   const logger = {
-    info: (...args) => console.log("[INFO]", ...args),
-    error: (...args) => console.error("[ERROR]", ...args),
-    warn: (...args) => console.warn("[WARN]", ...args),
-    debug: (...args) => console.debug("[DEBUG]", ...args),
+    info: (...args: any[]) => console.log("[INFO]", ...args),
+    error: (...args: any[]) => console.error("[ERROR]", ...args),
+    warn: (...args: any[]) => console.warn("[WARN]", ...args),
+    debug: (...args: any[]) => console.debug("[DEBUG]", ...args),
   };
 
   console.log(">>> LOADING TASK STORE...");
@@ -49,6 +49,64 @@ async function main() {
     if (status === "running") emoji = "🚀";
     let message = `${emoji} *Task Update*\n\n*ID:* \`${task.id}\`\n*Stage:* \`${stage}\`\n*Status:* \`${status}\``;
     
+    if (stage === "BA_ANALYSIS") {
+      if (status === "waiting_for_approval") {
+        if (task.baOutput) {
+          emoji = "🔍";
+          message = `${emoji} *BA Requirements Proposal* for task \`${task.id}\`\n\n` +
+            `*Business Requirements:*\n` +
+            task.baOutput.business_requirements.map((r) => `- ${r}`).join("\n") +
+            `\n\n*User Stories:*\n` +
+            task.baOutput.user_stories.map((us) => {
+              if (typeof us === "string") return `- ${us}`;
+              return `- As an *${us.role || "User"}*, I want to *${us.goal}* ${us.benefit ? `so that I can *${us.benefit}*` : ""}`;
+            }).join("\n") +
+            `\n\n*Edge Cases:*\n` +
+            task.baOutput.edge_cases.map((ec) => `- ${ec}`).join("\n") +
+            `\n\n*Assumptions:*\n` +
+            task.baOutput.assumptions.map((a) => `- ${a}`).join("\n") +
+            `\n\n💬 Reply to this message to discuss or modify the requirements, or send \`/approve\` to proceed to Project Planning.`;
+        } else if (task.clarifyingQuestions?.length) {
+          emoji = "❓";
+          message = `${emoji} *Clarifying Questions for Task* \`${task.id}\`\n\n` +
+            `The Business Analyst needs more details before planning:\n\n` +
+            task.clarifyingQuestions.map((q, idx) => `*${idx + 1}.* ${q}`).join("\n") +
+            `\n\nPlease reply directly to this message or use \`/answer <your responses>\` to continue.`;
+        }
+      } else if (status === "running") {
+        emoji = "🔍";
+        message = `${emoji} *Business Analysis Started* for task \`${task.id}\`...`;
+      } else if (status === "done") {
+        emoji = "🔍";
+        message = `${emoji} *Business Analysis Completed* for task \`${task.id}\`.\nRequirements generated.`;
+      }
+    } else if (stage === "PM_PLANNING") {
+      if (status === "running") {
+        emoji = "📋";
+        message = `${emoji} *Project Planning Started* for task \`${task.id}\`...`;
+      } else if (status === "waiting_for_approval" && task.pmOutput?.tasks?.length) {
+        emoji = "📋";
+        message = `${emoji} *PM Planning Proposal* for task \`${task.id}\`\n\n` +
+          `*Planned Tasks:*\n` +
+          task.pmOutput.tasks.map((t, idx) => {
+            const effort = t.estimated_effort ? ` (Effort: *${t.estimated_effort}*)` : "";
+            return `*${idx + 1}.* [${t.type.toUpperCase()}] *${t.title || t.description}*${effort}\n   _${t.description}_`;
+          }).join("\n\n") +
+          `\n\n✅ Send \`/approve\` to approve the plan and begin development implementation.`;
+      }
+    } else if (stage === "DEV_IMPLEMENTATION") {
+      if (status === "running") {
+        emoji = "🛠️";
+        message = `${emoji} *Backend Development Started* for task \`${task.id}\`...`;
+      } else if (status === "done") {
+        emoji = "💻";
+        message = `${emoji} *Code Changes Implemented* for task \`${task.id}\`!\nPull request has been created.`;
+      }
+    } else if (stage === "DONE" && status === "done") {
+      emoji = "🎉";
+      message = `${emoji} *SDLC Pipeline Completed!* for task \`${task.id}\`\nAll stages finished successfully.`;
+    }
+
     if (task.pullRequestUrl) {
         message += `\n\n*GitHub PR:* [View Changes](${task.pullRequestUrl})`;
     }

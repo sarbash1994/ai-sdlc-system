@@ -37,6 +37,7 @@ export class PipelineOrchestrator {
 
   async runMvpPipeline(taskId: string): Promise<SDLCTask> {
     let task = await this.requireTask(taskId);
+    console.log(`[Orchestrator] runMvpPipeline for task ${task.id}: stage=${task.currentStage}, status=${task.status}`);
     
     // BA Stage
     if (task.currentStage === "IDEA" || (task.currentStage === "BA_ANALYSIS" && task.status !== "done")) {
@@ -44,12 +45,12 @@ export class PipelineOrchestrator {
     }
     
     // PM Stage
-    if (task.currentStage === "BA_ANALYSIS" && task.status === "done") {
+    if ((task.currentStage === "BA_ANALYSIS" && task.status === "done") || (task.currentStage === "PM_PLANNING" && task.status !== "done")) {
       task = await this.runPM(task);
     }
 
     // Dev Stage
-    if (task.currentStage === "PM_PLANNING" && task.status === "done") {
+    if ((task.currentStage === "PM_PLANNING" && task.status === "done") || (task.currentStage === "DEV_IMPLEMENTATION" && task.status !== "done")) {
       task = await this.runBackendDev(task);
     }
     
@@ -64,30 +65,68 @@ export class PipelineOrchestrator {
 
   async runBA(task: SDLCTask): Promise<SDLCTask> {
     console.log(`[Orchestrator] Running BA for task ${task.id}`);
-    const { runBAAgent } = await import("../../agents/src/ba-agent.js");
-    
-    task = setStage(task, "BA_ANALYSIS", "running");
-    await this.taskStore.saveTask(task);
-    await this.notify(task);
+    const { runBAAgent, runBAQuestionsAgent } = await import("../../agents/src/ba-agent.js");
 
-    try {
-      const baOutput = await runBAAgent({
-        client: this.client,
-        model: this.config.openaiModel,
-        idea: task.idea
-      });
-
-      task.baOutput = baOutput;
-      task = setStage(task, "BA_ANALYSIS", "done");
+    // 1. If we have clarifying answers, run the full BA agent
+    if (task.clarifyingAnswers) {
+      task = setStage(task, "BA_ANALYSIS", "running");
       await this.taskStore.saveTask(task);
       await this.notify(task);
-      return task;
-    } catch (error) {
-      task = setStage(task, "BA_ANALYSIS", "failed");
-      await this.taskStore.saveTask(task);
-      await this.notify(task);
-      throw error;
+
+      try {
+        const baOutput = await runBAAgent({
+          client: this.client,
+          model: this.config.openaiModel,
+          idea: task.idea,
+          answers: task.clarifyingAnswers
+        });
+
+        task.baOutput = baOutput;
+        task = setStage(task, "BA_ANALYSIS", "waiting_for_approval");
+        await this.taskStore.saveTask(task);
+        await this.notify(task);
+        return task;
+      } catch (error) {
+        task = setStage(task, "BA_ANALYSIS", "failed");
+        await this.taskStore.saveTask(task);
+        await this.notify(task);
+        throw error;
+      }
     }
+
+    // 2. If we do not have clarifying questions yet, generate them
+    if (!task.clarifyingQuestions || task.clarifyingQuestions.length === 0) {
+      task = setStage(task, "BA_ANALYSIS", "running");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+
+      try {
+        const questionsResult = await runBAQuestionsAgent({
+          client: this.client,
+          model: this.config.openaiModel,
+          idea: task.idea
+        });
+
+        task.clarifyingQuestions = questionsResult.questions;
+        task = setStage(task, "BA_ANALYSIS", "waiting_for_approval");
+        await this.taskStore.saveTask(task);
+        await this.notify(task);
+        return task;
+      } catch (error) {
+        task = setStage(task, "BA_ANALYSIS", "failed");
+        await this.taskStore.saveTask(task);
+        await this.notify(task);
+        throw error;
+      }
+    }
+
+    // 3. If questions are generated but no answers are received yet, keep in waiting_for_approval
+    if (task.status !== "waiting_for_approval") {
+      task = setStage(task, "BA_ANALYSIS", "waiting_for_approval");
+      await this.taskStore.saveTask(task);
+      await this.notify(task);
+    }
+    return task;
   }
 
   async runPM(task: SDLCTask): Promise<SDLCTask> {
@@ -104,11 +143,11 @@ export class PipelineOrchestrator {
       const pmOutput = await runPMAgent({
         client: this.client,
         model: this.config.openaiModel,
-        baOutput: task.baOutput
+        baOutput: task.baOutput!
       });
 
       task.pmOutput = pmOutput;
-      task = setStage(task, "PM_PLANNING", "done");
+      task = setStage(task, "PM_PLANNING", "waiting_for_approval");
       await this.taskStore.saveTask(task);
       await this.notify(task);
       return task;
@@ -143,14 +182,14 @@ export class PipelineOrchestrator {
       const context = await this.retriever.retrieve(backendTask.description);
       const formattedContext = formatRetrievedContext(context);
 
-      const titleForBranch = backendTask.title || "backend-task";
-      const branchName = `feature/${slugifyBranchPart(String(titleForBranch))}-${task.id.split('_').pop()}`;
+      const prDetails = await this.generateEnglishPRDetails(task.idea, backendTask.description);
+      const branchName = `feature/${slugifyBranchPart(prDetails.branchSlug)}-${task.id.split('_').pop()}`;
       const devOutput = await runBackendDevAgent({
         client: this.client,
         model: this.config.openaiModel,
         task: backendTask,
-        context: formattedContext,
-        branch: branchName
+        codeContext: formattedContext,
+        branchHint: branchName
       });
 
       const { createPullRequestFromDiffs } = await import("../../tools/src/index.js");
@@ -165,7 +204,9 @@ export class PipelineOrchestrator {
         {
           taskId: task.id,
           idea: task.idea,
-          devOutput: devOutput
+          devOutput: devOutput,
+          prTitle: prDetails.title,
+          prBody: prDetails.body
         }
       );
 
@@ -190,5 +231,47 @@ export class PipelineOrchestrator {
     task.logs.push(`${nowIso()} GitHub PR created: ${pullRequestUrl}`);
     await this.taskStore.saveTask(task);
     return task;
+  }
+
+  private async generateEnglishPRDetails(idea: string, taskDescription: string): Promise<{ title: string; branchSlug: string; body: string }> {
+    const prompt = `You are a helper that translates development task information to English for GitHub.
+Original task description/idea (in Russian):
+"${idea}"
+
+Subtask details (in Russian):
+"${taskDescription}"
+
+Please generate:
+1. A clean, concise Pull Request Title in English (e.g. "feat: add user authentication flow").
+2. A short URL/git-branch-friendly slug in English for this task (e.g. "add-user-auth").
+3. A Pull Request Description/Body in English summarizing what this change will accomplish.
+
+Return a JSON object:
+{
+  "title": "...",
+  "branchSlug": "...",
+  "body": "..."
+}`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.config.openaiModel,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      });
+      const parsed = JSON.parse(response.choices[0]?.message?.content || "{}");
+      return {
+        title: parsed.title || "feat: implement backend task",
+        branchSlug: parsed.branchSlug || "backend-task",
+        body: parsed.body || "Implemented backend changes as specified."
+      };
+    } catch (error) {
+      console.error("Failed to generate English PR details:", error);
+      return {
+        title: "feat: implement backend task",
+        branchSlug: "backend-task",
+        body: "Implemented backend changes as specified."
+      };
+    }
   }
 }
