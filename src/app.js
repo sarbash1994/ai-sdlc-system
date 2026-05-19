@@ -1,23 +1,19 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const suggestionsRouter = require('./routes/suggestions');
+const clarifyingQuestionsRouter = require('./routes/clarifyingQuestions');
 
 const app = express();
 
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/suggestionsdb', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/clarifying_questions', {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => {
-  console.log('Connected to MongoDB');
-}).catch(err => {
-  console.error('MongoDB connection error:', err);
 });
 
-// Suggestions routes
-app.use('/suggestions', suggestionsRouter);
+// Routes
+app.use('/api/clarifying-questions', clarifyingQuestionsRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
