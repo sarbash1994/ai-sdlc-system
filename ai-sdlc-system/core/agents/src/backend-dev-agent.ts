@@ -261,12 +261,13 @@ The final JSON output must conform to this schema:
   "changes": [
     {
       "file": "relative/path/to/file",
-      "diff": "FULL FILE CONTENT HERE (the entire code of the file including your changes)",
+      "diff": "READ_FROM_DISK",
       "rationale": "Description of what was changed and why"
     }
   ],
   "commands": ["npm test"]
-}`
+}
+Note: For the 'diff' field, ALWAYS output the exact string "READ_FROM_DISK". The system will automatically read the file you modified from the workspace. DO NOT output the file content in the JSON.`
     },
     {
       "role": "user",
@@ -338,6 +339,23 @@ The final JSON output must conform to this schema:
         console.log(`[Backend Dev Agent] Final Turn output received.`);
         try {
           const json = JSON.parse(cleaned);
+
+          // Populate the 'diff' field with actual file contents before validation
+          if (json.changes && Array.isArray(json.changes)) {
+            for (const change of json.changes) {
+              if (change.diff === "READ_FROM_DISK" && change.file) {
+                try {
+                  change.diff = await readAgentFile(change.file, tempDir);
+                } catch (readErr) {
+                  console.warn(`[Backend Dev Agent] Failed to read ${change.file}:`, readErr);
+                  // We can't let it fail schema validation if the file is missing,
+                  // or the agent will loop. But if the file is missing, there's a problem.
+                  // It will fail validation if diff is empty, but we'll leave it to schema validation.
+                }
+              }
+            }
+          }
+
           const parsed = backendDevOutputSchema.parse(json);
           return parsed;
         } catch (err) {
