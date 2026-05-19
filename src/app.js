@@ -1,24 +1,17 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const clarifyingQuestionsRouter = require('./routes/clarifyingQuestions');
+const bodyParser = require('body-parser');
+const languageValidationRouter = require('./routes/languageValidation');
 
 const app = express();
 
-app.use(express.json());
+app.use(bodyParser.json());
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/clarifying_questions', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
-
-// Routes
-app.use('/api/clarifying-questions', clarifyingQuestionsRouter);
+app.use('/api/language', languageValidationRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
+  console.error(err);
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 module.exports = app;
