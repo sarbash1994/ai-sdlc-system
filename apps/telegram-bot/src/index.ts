@@ -37,7 +37,7 @@ bot.start(async (ctx) => {
 });
 
 bot.command("agents", async (ctx) => {
-  await ctx.reply(["Available MVP agents:", "- BA (Business Analyst)", "- PM (Product Manager)", "- Backend Developer", "- Frontend Developer", "- Mobile Developer", "- DevOps Engineer", "- QA Automation Engineer", "- QA Manual Engineer"].join("\n"));
+  await ctx.reply(["Available MVP agents:", "- BA (Business Analyst)", "- PM (Product Manager)", "- Senior Fullstack Developer", "- Backend Developer", "- Frontend Developer", "- Mobile Developer", "- DevOps Engineer", "- QA Automation Engineer", "- QA Manual Engineer"].join("\n"));
 });
 
 async function createIdeaFromText(ctx: any, idea: string) {
@@ -180,6 +180,31 @@ bot.action(/^approve_(.+)$/, async (ctx) => {
   }
 });
 
+bot.action(/^revise_(.+)$/, async (ctx) => {
+  const taskId = ctx.match[1];
+  if (!taskId) return;
+
+  try {
+    await ctx.answerCbQuery();
+    await ctx.reply(`Sending task ${taskId} back to PM for revision...`);
+    const response = await fetch(`${config.apiBaseUrl}/tasks/${encodeURIComponent(taskId)}/revise`, {
+      method: "POST",
+      headers: { "content-type": "application/json" }
+    });
+
+    if (!response.ok) {
+      await ctx.reply(`Could not revise plan: ${await response.text()}`);
+      return;
+    }
+
+    await ctx.reply(`Task ${taskId} is being revised by PM!`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error: message }, "telegram revise failed");
+    await ctx.reply(`Error revising task: ${message}`);
+  }
+});
+
 bot.action(/^decline_(.+)$/, async (ctx) => {
   const taskId = ctx.match[1];
   if (!taskId) return;
@@ -211,29 +236,6 @@ bot.on("message", async (ctx, next) => {
     }
   }
   await next();
-});
-
-// New command /health implementation
-bot.command("health", async (ctx) => {
-  try {
-    const response = await fetch(`${config.apiBaseUrl}/health/detailed`);
-    if (!response.ok) {
-      await ctx.reply(`API health check failed with status: ${response.status}`);
-      return;
-    }
-    const data = await response.json();
-
-    // Format the data for Telegram display
-    const formattedMessage = Object.entries(data)
-      .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
-      .join("\n");
-
-    await ctx.reply(formattedMessage);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error({ error: message }, "telegram health command failed");
-    await ctx.reply(`Could not reach API at ${config.apiBaseUrl}: ${message}`);
-  }
 });
 
 bot.catch((error) => {
